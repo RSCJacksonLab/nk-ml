@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
+import numpy as np
+from sklearn.model_selection import train_test_split
 
 
 
@@ -128,3 +130,43 @@ def train_model_no_early_stopping(model, optimizer, loss_fn, train_loader, n_epo
         
     print("Training completed")
     return epoch_losses
+
+
+
+def train_val_test_split_ohe(landscapes, test_split=0.2, val_split=0.2): 
+    """Args: 
+            landscapes (list): List of Protein_Landscape class objects
+            test_split (float [0,1]): proportion of total data used for testing
+            val_split (float [0,1]): proportion of train data used for validation"""
+    LANDSCAPES_OHE = [np.array(i.one_hot_encodings) for i in landscapes]
+    X_OHE = LANDSCAPES_OHE
+    Y_OHE = [i.fitnesses.reshape(-1,1).astype(float) for i in landscapes]
+    XY_OHE = [list(zip(torch.from_numpy(X_OHE[i]).to(torch.float32), torch.from_numpy(Y_OHE[i]).to(torch.float32))) for i in range(len(X_OHE))]
+    XY_OHE_TRAIN_TEST_SPLIT = [train_test_split(i, test_size=round(len(i)*test_split)) for i in XY_OHE]
+    
+    XY_TRAIN = [i[0] for i in XY_OHE_TRAIN_TEST_SPLIT]
+    XY_TEST  = [i[1] for i in XY_OHE_TRAIN_TEST_SPLIT]
+    XY_TRAIN_VAL_SPLIT = [train_test_split(i, test_size=round(len(i)*val_split)) for i in XY_TRAIN]
+    
+    XY_TRAINING = [i[0] for i in XY_TRAIN_VAL_SPLIT]
+    XY_VAL      = [i[1] for i in XY_TRAIN_VAL_SPLIT]
+
+
+    X_TEST = []
+    Y_TEST = []
+
+    for ind, i in enumerate(XY_OHE_TRAIN_TEST_SPLIT):
+        
+        x_test = []
+        y_test = []
+        for x, y in XY_OHE_TRAIN_TEST_SPLIT[ind][1]: 
+            x_test.append(x.numpy())
+            y_test.append(y.numpy())
+
+        x_test = torch.from_numpy(np.array(x_test))
+        y_test = torch.from_numpy(np.array(y_test))
+        
+        X_TEST.append(x_test)
+        Y_TEST.append(y_test)
+    
+    return LANDSCAPES_OHE, XY_TRAINING, XY_VAL, XY_TEST, X_TEST, Y_TEST
