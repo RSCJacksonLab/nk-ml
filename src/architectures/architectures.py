@@ -53,7 +53,7 @@ class SequenceRegressionMLP(nn.Module):
         for index, fc_layer in enumerate(self.fc_layers): 
             x = torch.relu(fc_layer(x))
 
-        x = self.output(x)  # Output layer without activation for real value prediction
+        x = self.output_layer(x)  # Output layer without activation for real value prediction
         return x
 
 
