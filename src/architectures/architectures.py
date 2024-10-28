@@ -2,10 +2,25 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-import torch
-import torch.nn as nn
-import torch.optim as optim
 
+
+
+
+class SequenceRegressionLinear(nn.Module): 
+    def __init__(self, alphabet_size=5, sequence_length=10):
+        super(SequenceRegressionLinear, self).__init__()
+        self.alphabet_size   = alphabet_size
+        self.sequence_length = sequence_length
+
+        input_size = self.alphabet_size*self.sequence_length
+
+        self.linear = nn.Linear(input_size, 1)
+
+    def forward(self, x):
+        x = x.view(x.size(0), -1) # Flatten the input from (batch_size, sequence_length, alphabet_size) to (batch_size, sequence_length * alphabet_size)
+        # Pass through the linear layer
+        x = self.linear(x)  # Shape: (batch_size, 1)
+        return x
 
 
 
@@ -13,7 +28,6 @@ class SequenceRegressionMLP(nn.Module):
     def __init__(self, alphabet_size=5, sequence_length=10, hidden_sizes=[128,64]):
         super(SequenceRegressionMLP, self).__init__()
 
-        self.batch_size = batch_size
         self.alphabet_size = alphabet_size
         self.sequence_length = sequence_length
 
@@ -116,31 +130,6 @@ class SequenceRegressionCNN(nn.Module):
 
 
 
-
-class AminoAcidLSTM(nn.Module):
-    def __init__(self, input_size, hidden_size=128, num_layers=2):
-        super(AminoAcidLSTM, self).__init__()
-        
-        # Define the LSTM layer
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-        
-        # Fully connected layer for the final output
-        self.fc = nn.Linear(hidden_size, 1)
-        
-    def forward(self, x):
-        # LSTM layer output
-        lstm_out, _ = self.lstm(x)
-        
-        # Get the output from the last time step
-        last_out = lstm_out[:, -1, :]  # Shape: (batch_size, hidden_size)
-        
-        # Fully connected layer
-        output = self.fc(last_out)  # Shape: (batch_size, 1)
-        return output
-
-
-
-
 class SequenceRegressionLSTM(nn.Module):
     def __init__(self, input_size=20, hidden_size=128, num_layers=2, bidirectional=True):
         """
@@ -182,4 +171,62 @@ class SequenceRegressionLSTM(nn.Module):
 
         # Pass through the output layer
         output = self.output_layer(last_out)  # Shape: (batch_size, 1)
+        return output
+
+
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, max_len=10):
+        super(PositionalEncoding, self).__init__()
+        
+        # Create a matrix of max_len x d_model for positional encoding
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0).transpose(0, 1)
+        
+        self.register_buffer('pe', pe)
+    
+    def forward(self, x):
+        x = x + self.pe[:x.size(0), :]
+        return x
+
+class SequenceRegressionTransformer(nn.Module):
+    def __init__(self, input_dim, d_model=64, nhead=4, num_layers=2, dim_feedforward=256, max_seq_length=10):
+        super(SequenceRegressionTransformer, self).__init__()
+        
+        # Embedding layer to convert one-hot encoded amino acids to dense vectors
+        self.embedding = nn.Linear(input_dim, d_model)
+        
+        # Positional encoding to add sequence position information
+        self.positional_encoding = PositionalEncoding(d_model, max_seq_length)
+        
+        # Transformer encoder
+        encoder_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead, 
+                                                   dim_feedforward=dim_feedforward)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+        
+        # Fully connected output layer for regression
+        self.fc_out = nn.Linear(d_model, 1)
+    
+    def forward(self, x):
+        # x shape: (batch_size, sequence_length, input_dim)
+        
+        # Step 1: Embed the input
+        x = self.embedding(x)  # Shape: (batch_size, sequence_length, d_model)
+        
+        # Step 2: Apply positional encoding
+        x = x.permute(1, 0, 2)  # Transformer expects input shape (sequence_length, batch_size, d_model)
+        x = self.positional_encoding(x)
+        
+        # Step 3: Transformer encoder
+        transformer_out = self.transformer_encoder(x)  # Shape: (sequence_length, batch_size, d_model)
+        
+        # Step 4: Take the output of the last sequence element
+        final_out = transformer_out[-1]  # Shape: (batch_size, d_model)
+        
+        # Step 5: Fully connected layer to produce a single output
+        output = self.fc_out(final_out)  # Shape: (batch_size, 1)
         return output
