@@ -43,10 +43,11 @@ class EarlyStopping:
         """Saves model when validation loss decreases."""
         torch.save(model.state_dict(), self.path)
 
-def train_model(model, optimizer, loss_fn, train_loader, val_loader, n_epochs=30, device='cpu', patience=5):
-    early_stopping = EarlyStopping(patience=patience)
+def train_model(model, optimizer, loss_fn, train_loader, val_loader, n_epochs=30, device='cpu', patience=5, min_delta=1e-5):
+    early_stopping = EarlyStopping(patience=patience, min_delta=min_delta)
     model = model.to(device)
-    epoch_losses = []
+    val_epoch_losses = []
+    train_epoch_losses = []
     
     for epoch in range(n_epochs):
         model.train()  # Training mode
@@ -63,7 +64,7 @@ def train_model(model, optimizer, loss_fn, train_loader, val_loader, n_epochs=30
             train_loss += loss.item()
         
         epoch_loss = train_loss/len(train_loader)
-        epoch_losses.append(epoch_loss)
+        train_epoch_losses.append(epoch_loss)
 
         # Validation phase
         model.eval()
@@ -78,6 +79,7 @@ def train_model(model, optimizer, loss_fn, train_loader, val_loader, n_epochs=30
                 loss = loss_fn(outputs, targets)
                 val_loss += loss.item()
         val_loss /= len(val_loader)
+        val_epoch_losses.append(val_loss)
 
         print(f"Epoch [{epoch+1}/{n_epochs}], Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
 
@@ -89,7 +91,7 @@ def train_model(model, optimizer, loss_fn, train_loader, val_loader, n_epochs=30
 
     # Load the best model after early stopping
     model.load_state_dict(torch.load(early_stopping.path))
-    return model, epoch_losses
+    return model, train_epoch_losses, val_epoch_losses
 
 
 
