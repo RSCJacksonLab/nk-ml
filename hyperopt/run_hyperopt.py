@@ -1,0 +1,141 @@
+import optuna as opt
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import numpy as np
+#from twilio.rest import Client
+import pickle
+
+import time
+
+import sys
+sys.path.append('/home/ubuntu/nk-paper-2024-1/pscapes')
+sys.path.append('/home/ubuntu/nk-paper-2024-1/nk-ml-2024')
+
+from torch.utils.data import DataLoader
+
+from pscapes.landscape_class import ProteinLandscape
+from pscapes.utils import dict_to_np_array, np_array_to_dict
+
+from src.architectures.architectures import SequenceRegressionCNN, SequenceRegressionLinear, SequenceRegressionMLP, SequenceRegressionLSTM, SequenceRegressionTransformer 
+
+from src.architectures.ml_utils import train_val_test_split_ohe
+from src.hyperopt import objective_NK
+
+
+torch.backends.nnpack.enabled = False
+
+
+
+
+def main():
+
+    print('Initialising parameters...')
+    SEQ_LEN = 6
+    AA_ALPHABET  = 'ACDEFG'
+    ALPHABET_LEN = len(AA_ALPHABET)
+    K_VALUES_TO_LOAD = range(SEQ_LEN)
+    REPLICATES = 1 #we only optimise hyperparameters on a single set of replicates for computational efficiency
+    learning_rates = [0.01, 0.001, 0.0001]
+    batch_sizes    = [32, 64, 128, 256]
+    
+    LINEAR_HPARAMS_SPACE = {'learning_rate': learning_rates, 'batch_size': batch_sizes, 
+                           'alphabet_size':ALPHABET_LEN, 'sequence_length':SEQ_LEN} 
+    
+    MLP_HPARAM_SPACE     = {'learning_rate': learning_rates, 'batch_size': batch_sizes, 
+                            'alphabet_size':ALPHABET_LEN, 'sequence_length':SEQ_LEN, 'max_hidden_layers':3,
+                            'hidden_sizes_categorical': [32, 64, 128, 256]} 
+    
+    CNN_HPARAM_SPACE     = {'learning_rate': learning_rates, 'batch_size': batch_sizes, 
+                            'alphabet_size':ALPHABET_LEN, 'sequence_length':SEQ_LEN, 'max_conv_layers':2, #important to keep the max_conv_layers small for NK landscapes to avoid pooling error resulting in RuntimeError: max_pool1d() Invalid computed output size: 0
+
+                            'n_kernels_min':32, 'n_kernels_max':256, 'n_kernels_step': 32, 'kernel_sizes_min':3, 
+                           'kernel_sizes_max':5}
+
+    uLSTM_HPARAM_SPACE   = {'learning_rate': learning_rates, 'batch_size': batch_sizes, 
+                            'alphabet_size':ALPHABET_LEN, 'max_lstm_layers': 4, 'hidden_sizes': [64, 128, 256, 512], 
+                           'bidirectional':False}
+
+    bLSTM_HPARAM_SPACE   = {'learning_rate': learning_rates, 'batch_size': batch_sizes, 
+                            'alphabet_size':ALPHABET_LEN, 'max_lstm_layers': 4, 'hidden_sizes': [64, 128, 256, 512], 
+                            'bidirectional':True}
+
+    TRANS_HPARAM_SPACE   = {'learning_rate': learning_rates, 'batch_size': batch_sizes, 
+                            'alphabet_size':ALPHABET_LEN, 'max_lstm_layers': 4,'embed_dim_options':[16, 32, 64, 128, 256],                                       'max_heads':8, 'max_layers':4, 'feedforward_dims': [32, 64, 128, 256], 
+                            'max_seq_lengths':[6, 8, 10]}
+
+
+
+    print('Loading landscapes...')
+    LANDSCAPES = []
+    for k in K_VALUES_TO_LOAD: 
+        for r in range(REPLICATES): 
+            landscape = ProteinLandscape(csv_path='../data/nk_landscapes/k{0}_r{1}.csv'.format(k,r), amino_acids=AA_ALPHABET)
+            LANDSCAPES.append(landscape)
+    
+    LANDSCAPES = [i.fit_OHE() for i in LANDSCAPES]
+    
+    landscapes_ohe, xy_train, xy_val, xy_test, x_test, y_test = train_val_test_split_ohe(LANDSCAPES)
+
+    print('Creating studies...')
+
+    
+    model_names = ['linear', 'mlp', 'cnn', 'ulstm', 'blstm', 'transformer']
+
+    studies     = [[opt.create_study(direction='minimize') for i in LANDSCAPES] for j in model_names]
+
+    models  = [SequenceRegressionLinear, SequenceRegressionMLP, SequenceRegressionCNN, SequenceRegressionLSTM, 
+               SequenceRegressionLSTM, SequenceRegressionTransformer]
+
+    hparam_list = [LINEAR_HPARAMS_SPACE, MLP_HPARAM_SPACE, CNN_HPARAM_SPACE, uLSTM_HPARAM_SPACE, bLSTM_HPARAM_SPACE, TRANS_HPARAM_SPACE]
+
+
+    
+
+    print('Running studies...')
+    times = []
+    
+    for model_index, model in enumerate(models): 
+        print('Optimising hyperparameters for model: {}'.format(model))
+
+        t1 = time.time()
+        for study_index, study in enumerate(studies[model_index]):
+            print('Optimising K={}'.format(study_index))
+            study.optimize(lambda trial: objective_NK(trial, hparam_list[model_index], model,  train_data= xy_train[study_index], val_data=xy_val[study_index], n_epochs=5), n_trials=2)
+        t2 = time.time()
+        times.append(t2-t1)
+
+
+    with open('results/NK_hyperopt_results.pkl', 'wb') as handle: 
+        pickle.dump(studies, handle,protocol=pickle.HIGHEST_PROTOCOL )
+
+    with open('results/NK_hyperopt_results_times.pkl', 'wb') as handle: 
+        pickle.dump(times, handle,protocol=pickle.HIGHEST_PROTOCOL )
+
+    for index, t in enumerate(times): 
+        mins = t/60
+        print('Model:{0} took {1} mins to optimise hyperparameters'.format(model_names[index], mins) )
+    
+    print('Hyperparameter optimisation complete.')
+
+
+if __name__ == "__main__":
+    main()
+
+
+
+
+
+
+    
+
+    
+    
+
+
+
+    
+
+
+
+

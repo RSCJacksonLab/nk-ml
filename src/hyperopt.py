@@ -4,20 +4,14 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
-import pandas as pd
-import pickle
 import sys
-sys.path.append('/home/ubuntu/nk-paper-2024-1/pscapes')
 sys.path.append('/home/ubuntu/nk-paper-2024-1/nk-ml-2024')
 
 from torch.utils.data import DataLoader
 
-from pscapes.landscape_class import ProteinLandscape
-from pscapes.utils import dict_to_np_array, np_array_to_dict
 
-from src.architectures.architectures import SequenceRegressionCNN
-from src.architectures.ml_utils import train_val_test_split_ohe
 
+from src.architectures.architectures import SequenceRegressionCNN, SequenceRegressionLinear, SequenceRegressionMLP, SequenceRegressionLSTM, SequenceRegressionTransformer 
 
 torch.backends.nnpack.enabled = False
 
@@ -158,7 +152,7 @@ def objective_NK(trial, h_param_search_space, model, train_data, val_data, n_epo
     elif model==SequenceRegressionTransformer:
         embed_dim_options = hpss['embed_dim_options']
         max_heads = hpss['max_heads']
-        valid_combinations = generate_valid_combinations(embed_dim_options, max_heads)
+        valid_combinations = generate_valid_combinations_transformer(embed_dim_options, max_heads)
     
         d_model, nhead = trial.suggest_categorical("embed_dim_num_heads", valid_combinations)
             

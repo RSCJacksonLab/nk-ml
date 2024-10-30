@@ -133,7 +133,12 @@ def train_model_no_early_stopping(model, optimizer, loss_fn, train_loader, n_epo
     print("Training completed")
     return epoch_losses
 
-
+def landscapes_ohe_to_numpy(landscapes_list):
+    xy_np_flattened = [[(i[0].numpy().flatten(), i[1].numpy()) for i in j] for j in landscapes_list]
+    x_flat_array = np.array([[i[0] for i in j] for j in xy_train_np_flattened])
+    y_flat_array = np.array([[i[1] for i in j] for j in xy_train_np_flattened])
+    return x_flat_array, y_flat_array
+    
 
 def train_val_test_split_ohe(landscapes, test_split=0.2, val_split=0.2): 
     """Args: 
