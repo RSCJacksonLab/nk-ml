@@ -6,9 +6,6 @@ import math
 
 
 
-    
-
-
 
 class SequenceRegressionLinear(nn.Module): 
     def __init__(self, alphabet_size=5, sequence_length=10):
