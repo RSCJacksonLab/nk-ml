@@ -178,4 +178,36 @@ def objective_NK(trial, h_param_search_space, model, train_data, val_data, n_epo
     return val_loss
 
 
+def sklearn_objective(trial, model_name, x_train, y_train, x_val, y_val):
+    """
+    model_name (str):   either 'RF' or 'GB'
+    x_train(np.array):  np array of shape (samples, seq_length*alphabet_size)
+    y_train(np.array):  np array of shape (samples, )
+    x_val(np.array):    np array of shape (samples, seq_length*alphabet_size)
+    y_val(np.array):    np array of shape (samples, )
 
+    """
+    
+    if model_name=='RF': 
+        max_features = trial.suggest_float('max_features', 0.1, 1)
+        n_estimators = trial.suggest_int('n_estimators', 10, 1000)
+        max_depth    = trial.suggest_int('max_depth', 1, 32)
+        model        = RandomForestRegressor(max_features=max_features, n_estimators=n_estimators, 
+                                             max_depth=max_depth)
+    elif model_name=='GB': 
+        max_depth     = trial.suggest_int('max_depth', 1, 32)
+        n_estimators  = trial.suggest_int('n_estimators', 10, 1000)
+        learning_rate = trial.suggest_float('learning_rate', 0.001, 0.2) 
+        model         = GradientBoostingRegressor(max_depth=max_depth, n_estimators=n_estimators, 
+                                                  learning_rate=learning_rate)
+    else: 
+        raise Exception('Invalid model name. Model name must be "RF" or "GB".')
+    
+    print('Fitting model in trial.')
+    model.fit(x_train, y_train)
+    y_pred   = model.predict(x_val)
+    val_loss =  mean_squared_error(y_val, y_pred)
+        
+
+
+    return val_loss 

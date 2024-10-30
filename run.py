@@ -1,0 +1,1 @@
+#This scripts runs everything to reproduce results of the project. 

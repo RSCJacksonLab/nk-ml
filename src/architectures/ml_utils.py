@@ -135,25 +135,26 @@ def train_model_no_early_stopping(model, optimizer, loss_fn, train_loader, n_epo
 
 def landscapes_ohe_to_numpy(landscapes_list):
     xy_np_flattened = [[(i[0].numpy().flatten(), i[1].numpy()) for i in j] for j in landscapes_list]
-    x_flat_array = np.array([[i[0] for i in j] for j in xy_train_np_flattened])
-    y_flat_array = np.array([[i[1] for i in j] for j in xy_train_np_flattened])
+    x_flat_array = np.array([[i[0] for i in j] for j in xy_np_flattened])
+    y_flat_array = np.array([[i[1] for i in j] for j in xy_np_flattened])
     return x_flat_array, y_flat_array
     
 
-def train_val_test_split_ohe(landscapes, test_split=0.2, val_split=0.2): 
+def train_val_test_split_ohe(landscapes, test_split=0.2, val_split=0.2, random_state=1): 
     """Args: 
             landscapes (list): List of Protein_Landscape class objects
             test_split (float [0,1]): proportion of total data used for testing
-            val_split (float [0,1]): proportion of train data used for validation"""
+            val_split (float [0,1]): proportion of train data used for validation
+            random_state (int):      controls random state of sklearn train_test_split for reproducible splits. Default 1. """
     LANDSCAPES_OHE = [np.array(i.one_hot_encodings) for i in landscapes]
     X_OHE = LANDSCAPES_OHE
     Y_OHE = [i.fitnesses.reshape(-1,1).astype(float) for i in landscapes]
     XY_OHE = [list(zip(torch.from_numpy(X_OHE[i]).to(torch.float32), torch.from_numpy(Y_OHE[i]).to(torch.float32))) for i in range(len(X_OHE))]
-    XY_OHE_TRAIN_TEST_SPLIT = [train_test_split(i, test_size=round(len(i)*test_split)) for i in XY_OHE]
+    XY_OHE_TRAIN_TEST_SPLIT = [train_test_split(i, test_size=round(len(i)*test_split), random_state=random_state) for i in XY_OHE]
     
     XY_TRAIN = [i[0] for i in XY_OHE_TRAIN_TEST_SPLIT]
     XY_TEST  = [i[1] for i in XY_OHE_TRAIN_TEST_SPLIT]
-    XY_TRAIN_VAL_SPLIT = [train_test_split(i, test_size=round(len(i)*val_split)) for i in XY_TRAIN]
+    XY_TRAIN_VAL_SPLIT = [train_test_split(i, test_size=round(len(i)*val_split), random_state=random_state) for i in XY_TRAIN]
     
     XY_TRAINING = [i[0] for i in XY_TRAIN_VAL_SPLIT]
     XY_VAL      = [i[1] for i in XY_TRAIN_VAL_SPLIT]

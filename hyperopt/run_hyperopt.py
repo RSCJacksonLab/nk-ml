@@ -25,10 +25,15 @@ from src.hyperopt import objective_NK
 
 torch.backends.nnpack.enabled = False
 
+### MAKE SURE YOU DON'T TUNE HYPERPARAMETERS ON THE TEST SET !!!! IE YOU'LL NEED TO SAVE THE TEST/TRAIN/VAL SPLITS 
+### --> I solved this problem using random_state in the train_test split function in numpy. Works well, I've tested it. 
 
 
 
-def main():
+
+    
+
+def run_hparam_opt():
 
     print('Initialising parameters...')
     SEQ_LEN = 6
@@ -72,15 +77,15 @@ def main():
         for r in range(REPLICATES): 
             landscape = ProteinLandscape(csv_path='../data/nk_landscapes/k{0}_r{1}.csv'.format(k,r), amino_acids=AA_ALPHABET)
             LANDSCAPES.append(landscape)
-    
+
     LANDSCAPES = [i.fit_OHE() for i in LANDSCAPES]
-    
+
     landscapes_ohe, xy_train, xy_val, xy_test, x_test, y_test = train_val_test_split_ohe(LANDSCAPES)
 
     print('Creating studies...')
 
     
-    model_names = ['linear', 'mlp', 'cnn', 'ulstm', 'blstm', 'transformer']
+    model_names = ['linear', 'mlp', 'cnn', 'ulstm', 'blstm', 'transformer', 'RF', 'GB']
 
     studies     = [[opt.create_study(direction='minimize') for i in LANDSCAPES] for j in model_names]
 
@@ -120,7 +125,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_hparam_opt()
 
 
 
