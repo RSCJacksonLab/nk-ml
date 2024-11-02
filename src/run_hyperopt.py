@@ -13,18 +13,20 @@ import os
 
 
 sys.path.append('../../pscapes')
-sys.path.append('../../nk-ml-2024')
+sys.path.append('./')
+
 
 from torch.utils.data import DataLoader
 
 from pscapes.landscape_class import ProteinLandscape
 from pscapes.utils import dict_to_np_array, np_array_to_dict
 
-from src.architectures.architectures import SequenceRegressionCNN, SequenceRegressionLinear, SequenceRegressionMLP, SequenceRegressionLSTM, SequenceRegressionTransformer 
+from architectures import SequenceRegressionCNN, SequenceRegressionLinear, SequenceRegressionMLP, SequenceRegressionLSTM, SequenceRegressionTransformer
 
-from src.architectures.ml_utils import train_val_test_split_ohe
-from src.hyperopt import objective_NK, sklearn_objective_NK
+from ml_utils import train_val_test_split_ohe, landscapes_ohe_to_numpy
+from hyperopt import objective_NK, sklearn_objective_NK
 
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor 
 
 torch.backends.nnpack.enabled = False
 
@@ -48,7 +50,7 @@ def run_hparam_opt():
     batch_sizes    = [32, 64, 128, 256]
 
     n_trials = 2 
-    n_epochs = None
+    n_epochs = 2
     
     LINEAR_HPARAMS_SPACE = {'learning_rate': learning_rates, 'batch_size': batch_sizes, 
                            'alphabet_size':ALPHABET_LEN, 'sequence_length':SEQ_LEN} 
@@ -86,12 +88,22 @@ def run_hparam_opt():
 
     LANDSCAPES = [i.fit_OHE() for i in LANDSCAPES]
 
-    landscapes_ohe, xy_train, xy_val, xy_test, x_test, y_test = train_val_test_split_ohe(LANDSCAPES)
+    landscapes_ohe, xy_train, xy_val, xy_test, x_test, y_test = train_val_test_split_ohe(LANDSCAPES, random_state=1)
+
+
+    x_train_np, y_train_np = landscapes_ohe_to_numpy(xy_train) #intialise flattened np arrays for RF and GB training 
+    x_val_np, y_val_np = landscapes_ohe_to_numpy(xy_val)
+
+
+
 
     print('Creating studies...')
 
     
     model_names = ['linear', 'mlp', 'cnn', 'ulstm', 'blstm', 'transformer', 'RF', 'GB']
+
+    models = [SequenceRegressionLinear, SequenceRegressionMLP, SequenceRegressionCNN, SequenceRegressionLSTM, 
+              SequenceRegressionLSTM, SequenceRegressionTransformer, RandomForestRegressor, GradientBoostingRegressor]
 
     study_list = [[opt.create_study(direction='minimize') for i in LANDSCAPES] for j in model_names]
 
@@ -115,17 +127,21 @@ def run_hparam_opt():
 
 
         for study_index, study in enumerate(studies[model_name]):
+            #study index loops over K values for each model 
             print('Optimising K={}'.format(study_index))
+
 
 
             if model_name=='RF' or model_name=='GB': 
                                 
-                study.optimize(lambda trial: sklearn_objective_NK(trial, model_name, x_train=None, y_train=None, x_val=None, y_val=None), n_trials=n_trials )
+                study.optimize(lambda trial: sklearn_objective_NK(trial, model_name, x_train=x_train_np[study_index], y_train=y_train_np[study_index].ravel(), 
+                    x_val=x_val_np[study_index], y_val=y_val_np[study_index].ravel()), n_trials=n_trials )
 
             else:
-                pass #(just for testing)
+                pass
+                #model = models[model_index]
                 #study.optimize(lambda trial: objective_NK(trial, hparam_list[model_index], model,  
-                    #train_data= xy_train[study_index], val_data=xy_val[study_index], n_epochs=n_epochs_), n_trials=n_trials)
+                    #train_data= xy_train[study_index], val_data=xy_val[study_index], n_epochs=n_epochs, device='cpu'), n_trials=n_trials)
         t2 = time.time()
         times['model_name']=(t2-t1)
 

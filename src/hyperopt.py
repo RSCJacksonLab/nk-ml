@@ -5,13 +5,20 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import sys
-sys.path.append('/home/ubuntu/nk-paper-2024-1/nk-ml-2024')
+sys.path.append('../../pscapes')
+sys.path.append('../../nk-ml-2024')
+sys.path.append('./')
+
+
 
 from torch.utils.data import DataLoader
 
 
 
-from src.architectures.architectures import SequenceRegressionCNN, SequenceRegressionLinear, SequenceRegressionMLP, SequenceRegressionLSTM, SequenceRegressionTransformer 
+from architectures import SequenceRegressionCNN, SequenceRegressionLinear, SequenceRegressionMLP, SequenceRegressionLSTM, SequenceRegressionTransformer 
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.metrics import mean_squared_error
+
 
 torch.backends.nnpack.enabled = False
 
@@ -178,7 +185,7 @@ def objective_NK(trial, h_param_search_space, model, train_data, val_data, n_epo
     return val_loss
 
 
-def sklearn_objective(trial, model_name, x_train, y_train, x_val, y_val):
+def sklearn_objective_NK(trial, model_name, x_train, y_train, x_val, y_val):
     """
     model_name (str):   either 'RF' or 'GB'
     x_train(np.array):  np array of shape (samples, seq_length*alphabet_size)
