@@ -147,10 +147,10 @@ def run_hparam_opt():
 
 
 
-    with open('results/NK_hyperopt_results.pkl', 'wb') as handle: 
+    with open('../hyperopt/results/NK_hyperopt_results.pkl', 'wb') as handle: 
         pickle.dump(studies, handle,protocol=pickle.HIGHEST_PROTOCOL )
 
-    with open('results/NK_hyperopt_results_times.pkl', 'wb') as handle: 
+    with open('../hyperopt/results/NK_hyperopt_results_times.pkl', 'wb') as handle: 
         pickle.dump(times, handle,protocol=pickle.HIGHEST_PROTOCOL )
 
     for model_name in times.keys(): 
