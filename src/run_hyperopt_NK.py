@@ -49,8 +49,8 @@ def run_hparam_opt():
     learning_rates = [0.01, 0.001, 0.0001]
     batch_sizes    = [32, 64, 128, 256]
 
-    n_trials = 2 
-    n_epochs = 2
+    n_trials = 5 
+    n_epochs = 100
     
     LINEAR_HPARAMS_SPACE = {'learning_rate': learning_rates, 'batch_size': batch_sizes, 
                            'alphabet_size':ALPHABET_LEN, 'sequence_length':SEQ_LEN} 
@@ -138,10 +138,10 @@ def run_hparam_opt():
                     x_val=x_val_np[study_index], y_val=y_val_np[study_index].ravel()), n_trials=n_trials )
 
             else:
-                pass
-                #model = models[model_index]
-                #study.optimize(lambda trial: objective_NK(trial, hparam_list[model_index], model,  
-                    #train_data= xy_train[study_index], val_data=xy_val[study_index], n_epochs=n_epochs, device='cpu'), n_trials=n_trials)
+                
+                model = models[model_index]
+                study.optimize(lambda trial: objective_NK(trial, hparam_list[model_index], model,  
+                    train_data= xy_train[study_index], val_data=xy_val[study_index], n_epochs=n_epochs, device='cuda'), n_trials=n_trials)
         t2 = time.time()
         times['model_name']=(t2-t1)
 
