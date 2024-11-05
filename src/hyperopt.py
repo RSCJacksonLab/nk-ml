@@ -146,8 +146,8 @@ def objective_NK(trial, h_param_search_space, model, train_data, val_data, n_epo
 
     elif model==SequenceRegressionCNN:
         num_conv_layers = trial.suggest_int('num_conv_layers', 1, hpss['max_conv_layers']) #max_conv_layers should be an int
-        n_kernels = [int(trial.suggest_discrete_uniform("n_kernels", hpss['n_kernels_min'], hpss['n_kernels_max'] , hpss['n_kernels_step']))for i in range(num_conv_layers)]      
-        kernel_sizes = [int(trial.suggest_discrete_uniform("kernel_sizes", hpss['kernel_sizes_min'], hpss['kernel_sizes_max'], 1))for i in range(num_conv_layers)]
+        n_kernels = [int(trial.suggest_int("n_kernels_layer{}".format(i), hpss['n_kernels_min'], hpss['n_kernels_max'] , hpss['n_kernels_step']))for i in range(num_conv_layers)]      
+        kernel_sizes = [int(trial.suggest_int("kernel_size_layer{}".format(i), hpss['kernel_sizes_min'], hpss['kernel_sizes_max'], 1))for i in range(num_conv_layers)]
         model_instance = model(input_channels=hpss['alphabet_size'], sequence_length=hpss['sequence_length'], num_conv_layers=num_conv_layers,
                               n_kernels=n_kernels, kernel_sizes=kernel_sizes)
     elif model==SequenceRegressionLSTM: 
@@ -200,7 +200,7 @@ def sklearn_objective_NK(trial, model_name, x_train, y_train, x_val, y_val):
         n_estimators = trial.suggest_int('n_estimators', 10, 1000)
         max_depth    = trial.suggest_int('max_depth', 1, 32)
         model        = RandomForestRegressor(max_features=max_features, n_estimators=n_estimators, 
-                                             max_depth=max_depth)
+                                             max_depth=max_depth, n_jobs=-1)
     elif model_name=='GB': 
         max_depth     = trial.suggest_int('max_depth', 1, 32)
         n_estimators  = trial.suggest_int('n_estimators', 10, 1000)

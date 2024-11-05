@@ -47,11 +47,11 @@ def run_hparam_opt():
     ALPHABET_LEN = len(AA_ALPHABET)
     K_VALUES_TO_LOAD = range(SEQ_LEN)
     REPLICATES = 1 #we only optimise hyperparameters on a single set of replicates for computational efficiency
+    N_TRIALS_MULTIPLIER = 2
     learning_rates = [0.01, 0.001, 0.0001]
     batch_sizes    = [32, 64, 128, 256]
 
-    n_trials = 1 
-    n_epochs = 1
+    n_epochs = 100
     
     LINEAR_HPARAMS_SPACE = {'learning_rate': learning_rates, 'batch_size': batch_sizes, 
                            'alphabet_size':ALPHABET_LEN, 'sequence_length':SEQ_LEN} 
@@ -75,7 +75,7 @@ def run_hparam_opt():
                             'bidirectional':True}
 
     TRANS_HPARAM_SPACE   = {'learning_rate': learning_rates, 'batch_size': batch_sizes, 
-                            'alphabet_size':ALPHABET_LEN, 'max_lstm_layers': 4,'embed_dim_options':[16, 32, 64, 128, 256],                                       'max_heads':8, 'max_layers':4, 'feedforward_dims': [32, 64, 128, 256], 
+                            'alphabet_size':ALPHABET_LEN,'embed_dim_options':[16, 32, 64, 128, 256],                                       'max_heads':8, 'max_layers':4, 'feedforward_dims': [32, 64, 128, 256], 
                             'max_seq_lengths':[6, 8, 10]}
 
 
@@ -136,12 +136,13 @@ def run_hparam_opt():
 
 
             if model_name=='RF' or model_name=='GB': 
-                                
+                
+                n_trials = 3*N_TRIALS_MULTIPLIER
                 study.optimize(lambda trial: sklearn_objective_NK(trial, model_name, x_train=x_train_np[study_index], y_train=y_train_np[study_index].ravel(), 
                     x_val=x_val_np[study_index], y_val=y_val_np[study_index].ravel()), n_trials=n_trials )
 
             else:
-                
+                n_trials = (len(hparam_list[model_index])-2)*N_TRIALS_MULTIPLIER
                 model = models[model_index]
                 study.optimize(lambda trial: objective_NK(trial, hparam_list[model_index], model,  
                     train_data= xy_train[study_index], val_data=xy_val[study_index], n_epochs=n_epochs, device=device), n_trials=n_trials)
