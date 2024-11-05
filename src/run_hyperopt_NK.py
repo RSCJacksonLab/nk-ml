@@ -27,6 +27,7 @@ from ml_utils import train_val_test_split_ohe, landscapes_ohe_to_numpy
 from hyperopt import objective_NK, sklearn_objective_NK
 
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor 
+from colorama import Fore
 
 torch.backends.nnpack.enabled = False
 
@@ -49,8 +50,8 @@ def run_hparam_opt():
     learning_rates = [0.01, 0.001, 0.0001]
     batch_sizes    = [32, 64, 128, 256]
 
-    n_trials = 5 
-    n_epochs = 100
+    n_trials = 1 
+    n_epochs = 1
     
     LINEAR_HPARAMS_SPACE = {'learning_rate': learning_rates, 'batch_size': batch_sizes, 
                            'alphabet_size':ALPHABET_LEN, 'sequence_length':SEQ_LEN} 
@@ -121,8 +122,10 @@ def run_hparam_opt():
     print('Running studies...')
     times = {}
     
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
     for model_index, model_name in enumerate(model_names): 
-        print('Optimising hyperparameters for model: {}'.format(model_name))
+        print(Fore.GREEN + 'Optimising hyperparameters for model: {}'.format(model_name) + Fore.RESET)
         t1 = time.time()
 
 
@@ -141,7 +144,7 @@ def run_hparam_opt():
                 
                 model = models[model_index]
                 study.optimize(lambda trial: objective_NK(trial, hparam_list[model_index], model,  
-                    train_data= xy_train[study_index], val_data=xy_val[study_index], n_epochs=n_epochs, device='cuda'), n_trials=n_trials)
+                    train_data= xy_train[study_index], val_data=xy_val[study_index], n_epochs=n_epochs, device=device), n_trials=n_trials)
         t2 = time.time()
         times['model_name']=(t2-t1)
 
