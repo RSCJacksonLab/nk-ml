@@ -47,7 +47,7 @@ def run_hparam_opt():
     ALPHABET_LEN = len(AA_ALPHABET)
     K_VALUES_TO_LOAD = range(SEQ_LEN)
     REPLICATES = 1 #we only optimise hyperparameters on a single set of replicates for computational efficiency
-    N_TRIALS_MULTIPLIER = 2
+    N_TRIALS_MULTIPLIER = 10
     learning_rates = [0.01, 0.001, 0.0001]
     batch_sizes    = [32, 64, 128, 256]
 
@@ -126,7 +126,11 @@ def run_hparam_opt():
 
     for model_index, model_name in enumerate(model_names): 
         print(Fore.GREEN + 'Optimising hyperparameters for model: {}'.format(model_name) + Fore.RESET)
+       
+        
+        
         t1 = time.time()
+
 
 
         for study_index, study in enumerate(studies[model_name]):
@@ -147,7 +151,7 @@ def run_hparam_opt():
                 study.optimize(lambda trial: objective_NK(trial, hparam_list[model_index], model,  
                     train_data= xy_train[study_index], val_data=xy_val[study_index], n_epochs=n_epochs, device=device), n_trials=n_trials)
         t2 = time.time()
-        times['model_name']=(t2-t1)
+        times[model_name]=(t2-t1)
 
 
 
@@ -160,7 +164,7 @@ def run_hparam_opt():
     for model_name in times.keys(): 
         t = times[model_name]
         mins = t/60
-        print('Model:{0} took {1} mins to optimise hyperparameters'.format(model_name, mins) )
+        print('Model:{} took {} mins to optimise hyperparameters'.format(model_name, mins) )
     
     print('Hyperparameter optimisation complete.')
 
