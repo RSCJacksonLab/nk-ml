@@ -10,38 +10,11 @@ import sys
 sys.path.append('../../pscapes')
 sys.path.append('../../nk-ml-2024/')
 
-from src.architectures import SequenceRegressionCNN, SequenceRegressionLSTM, SequenceRegressionMLP, SequenceRegressionLinear, SequenceRegressionTransformer
-
-
 from src.train_utils import read_CNN_hparams, read_MLP_hparams, read_LSTM_hparams, read_transformer_hparams
 
-def get_latent_representation(model, model_name,  x_data):
-    # Variable to store the final layer activation
-    final_activation = None
-
-    # Define a forward hook callback function to capture the output
-    def forward_hook(module, input, output):
-        nonlocal final_activation  # Use nonlocal to modify the variable outside the inner function
-        final_activation = output
-
-    # Attach the hook to the final layer of the model
-    if model_name == 'mlp': 
-        final_layer = model.fc_layers[-1]
-        hook_handle = final_layer.register_forward_hook(forward_hook)
-    elif model_name == 'cnn': 
-        final_layer = list(model.children())[-2] #gets the final MaxPool1d layer 
-        hook_handle = final_layer.register_forward_hook(forward_hook)
-    elif model_name == 'ulstm': 
-        final_layer = 
-
-    # Run a forward pass
-    _ = model(x_data)
-
-    # Remove the hook to prevent side effects
-    hook_handle.remove()
-
-    # Return the captured activation
-    return final_activation.detach()
+def get_latent_representation(model_instance): 
+    latent_model = nn.Sequential(*list(model_instance.children())[:-1])
+    return latent_model
 
 def instantiate_model_from_study(model_name, study, alphabet_size=6, seq_length=6): 
     if model_name == 'linear':
@@ -67,8 +40,6 @@ def instantiate_model_from_study(model_name, study, alphabet_size=6, seq_length=
     elif model_name == 'GB': 
         hparams = study.best_params
         model_instance = GradientBoostingRegressor(**hparams)
-    else: 
-        raise Exception('Unknown model name.')
     return model_instance
 
 

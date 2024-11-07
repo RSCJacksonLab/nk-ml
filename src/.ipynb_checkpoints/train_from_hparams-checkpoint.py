@@ -40,10 +40,10 @@ DATA_PATH = '../data/nk_landscapes/'
 MODEL_SAVEPATH = '../models/'
 RESULT_PATH = '../results/'
 
-N_EPOCHS = 100
+N_EPOCHS = 300
 N_REPLICATES = 1
 
-PATIENCE = 5
+PATIENCE = 20
 MIN_DELTA = 1e-6
 
 

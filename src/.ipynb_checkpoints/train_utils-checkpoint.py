@@ -94,7 +94,7 @@ def train_models_from_hparams_NK(hparams_path, datapath, model_savepath, result_
 
     results = {}
 
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    device = 'cuda' if torch.cuda.is_available else 'cpu'
 
     
     #loop over models 
