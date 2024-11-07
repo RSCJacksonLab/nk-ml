@@ -4,20 +4,19 @@ import torch.optim as optim
 import numpy as np
 import sys
 sys.path.append('../../pscapes')
-sys.path.append('./')
+sys.path.append('../../nk-ml-2024/')
 
 from torch.utils.data import DataLoader
 from pscapes.landscape_class import ProteinLandscape
 from pscapes.utils import dict_to_np_array, np_array_to_dict
-from architectures import SequenceRegressionCNN, SequenceRegressionLSTM, SequenceRegressionMLP, SequenceRegressionLinear, SequenceRegressionTransformer
+from src.architectures import SequenceRegressionCNN, SequenceRegressionLSTM, SequenceRegressionMLP, SequenceRegressionLinear, SequenceRegressionTransformer
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 
-from ml_utils import train_val_test_split_ohe, train_model, landscapes_ohe_to_numpy
+from src.ml_utils import train_val_test_split_ohe, train_model, landscapes_ohe_to_numpy
 
 import pickle
-from sklearn.metrics import r2_score
-
-import xgboost as xgb
+from sklearn.metrics import r2_score, mean_squared_error
+from scipy.stats import pearsonr
 
 
 def read_CNN_hparams(best_params): 
@@ -101,8 +100,7 @@ def train_models_from_hparams_NK(hparams_path, datapath, model_savepath, result_
     #loop over models 
     for model_name in hparam_studies.keys(): 
         print('Working on model name {}'.format(model_name))
-        if model_name!='RF' and model_name!='GB':             
-                pass
+ 
                 
         studies  = hparam_studies[model_name]
         assert len(landscapes) == len(studies), 'Number of K values does not match number of hyper-parameter studies.'
@@ -111,8 +109,7 @@ def train_models_from_hparams_NK(hparams_path, datapath, model_savepath, result_
 
         for k_index, study in enumerate(studies): #we loop over studies under each model, which should be equal to K values 
             print('Working on training for K = {}'.format(k_index))
-            k_results = {'r2':[], 'train_epoch_losses':[], 'val_epoch_losses': [], 'predictions': [],'ground_truth':[]}
-            results
+            k_results = {'test_r2':[], 'test_mse':[], 'test_pearson_r':[], 'train_epoch_losses':[], 'val_epoch_losses': [], 'predictions': [],'ground_truth':[]}
             params = study.best_params
 
 
@@ -200,19 +197,31 @@ def train_models_from_hparams_NK(hparams_path, datapath, model_savepath, result_
                     #evaluate model on test data
                     model_instance.eval()
         
-                    x_test = x_tests[replicate_index].to(device)
+                    x_test   = x_tests[replicate_index].to(device)
+                    y_test   = y_tests[replicate_index].to(device) 
                     
-                    y_pred  = model_instance(x_test)
-                    y_pred  = y_pred.cpu().detach()
-                    y_test  = y_tests[replicate_index].detach()        
-                    r2      = r2_score(y_pred, y_test)
+                    y_pred   = model_instance(x_test) #get predictions
+                    y_pred   = y_pred.detach() #detach tensors 
+                    y_test   = y_test.detach()
+                    
+                    test_mse = loss_fn(y_pred, y_test) #MSE 
+
+                    y_pred, y_test   = y_pred.cpu(), y_test.cpu() #send to cpu for scipy pearson and sklearn r2
+                    
+                    test_pearson_r = pearsonr(y_pred, y_test) #Pearson rho                       
+                                              
+                    test_r2  = r2_score(y_pred, y_test) #R^2
+
+                    
 
                     #collect data 
-                    k_results['r2'].append(r2)
+                    k_results['test_r2'].append(test_r2)
+                    k_results['test_mse'].append(test_mse)
+                    k_results['test_pearson_r'].append(test_pearson_r)
                     k_results['train_epoch_losses'].append(train_epoch_losses)
                     k_results['val_epoch_losses'].append(val_epoch_losses)
-                    k_results['predictions'].append(y_pred.numpy())
-                    k_results['ground_truth'].append(y_test.numpy())
+                    k_results['predictions'].append(y_pred)
+                    k_results['ground_truth'].append(y_test)
                 else: #now we deal with RF and GB 
                     if model_name == 'RF': 
                         model_instance = RandomForestRegressor(**model_params, n_jobs=-1)
@@ -220,8 +229,17 @@ def train_models_from_hparams_NK(hparams_path, datapath, model_savepath, result_
                         model_instance = GradientBoostingRegressor(**model_params)
                     model_instance.fit(x_train_np[replicate_index], y_train_np[replicate_index].ravel())
                     y_pred   = model_instance.predict(x_test_np[replicate_index])
-                    r2       =  r2_score(y_test_np[replicate_index].ravel(), y_pred)
-                    k_results['r2'].append(r2)
+                    y_test   = y_test_np[replicate_index].ravel()
+
+                    test_mse  = mean_squared_error(y_test, y_pred)
+                    test_r2   =  r2_score(y_test, y_pred)
+                    test_pearson_r = pearsonr(y_test, y_pred)
+
+                    
+                    k_results['test_r2'].append(test_r2)
+                    k_results['test_mse'].append(test_mse)
+                    k_results['test_pearson_r'].append(test_pearson_r)
+                    
                 
                 
             #update results dictionary 

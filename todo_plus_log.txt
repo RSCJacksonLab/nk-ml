@@ -1,0 +1,11 @@
+
+6/11/24
+1. Train models 
+	increase n_trials to ~x15/x20 
+	fix CNN even kernel size 
+	increase n_epochs in hparam opt and training to 200-500 
+    I think early stopping is causing blstm to stop training too early. Increasing patience on ES might be a good idea to
+    facilitate training. Similar situation might be happening with the transformer, probably because these models are more 
+    unstable. Or perhaps they're more susceptible to overtraining. 
+2. Write hooks for analysing latent space 
+4. Time permitting, write code for extrapolation and interpolation

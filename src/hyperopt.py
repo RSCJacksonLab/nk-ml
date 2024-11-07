@@ -134,8 +134,9 @@ def objective_NK(trial, h_param_search_space, model, train_data, val_data, n_epo
     hpss= h_param_search_space
     learning_rate = trial.suggest_categorical('lr', hpss['learning_rate'])
     batch_size    = trial.suggest_categorical('batch_size', hpss['batch_size'])
-    
+    print(model) 
     if model==SequenceRegressionLinear:
+        print (model)
         model_instance = model(alphabet_size=hpss['alphabet_size'], sequence_length=hpss['sequence_length'])
         
     elif model==SequenceRegressionMLP:
@@ -147,7 +148,7 @@ def objective_NK(trial, h_param_search_space, model, train_data, val_data, n_epo
     elif model==SequenceRegressionCNN:
         num_conv_layers = trial.suggest_int('num_conv_layers', 1, hpss['max_conv_layers']) #max_conv_layers should be an int
         n_kernels = [int(trial.suggest_int("n_kernels_layer{}".format(i), hpss['n_kernels_min'], hpss['n_kernels_max'] , hpss['n_kernels_step']))for i in range(num_conv_layers)]      
-        kernel_sizes = [int(trial.suggest_int("kernel_size_layer{}".format(i), hpss['kernel_sizes_min'], hpss['kernel_sizes_max'], 1))for i in range(num_conv_layers)]
+        kernel_sizes = [int(trial.suggest_int("kernel_size_layer{}".format(i), hpss['kernel_sizes_min'], hpss['kernel_sizes_max'], 2))for i in range(num_conv_layers)]
         model_instance = model(input_channels=hpss['alphabet_size'], sequence_length=hpss['sequence_length'], num_conv_layers=num_conv_layers,
                               n_kernels=n_kernels, kernel_sizes=kernel_sizes)
     elif model==SequenceRegressionLSTM: 
@@ -168,6 +169,8 @@ def objective_NK(trial, h_param_search_space, model, train_data, val_data, n_epo
         max_seq_length  = trial.suggest_categorical("max_seq_length", hpss['max_seq_lengths']) #shold be list of ints of possible max seq lengths                   
         model_instance  = model(input_dim=hpss['alphabet_size'], d_model=d_model, nhead=nhead,dim_feedforward=dim_feedforward,
                                max_seq_length=max_seq_length)
+    else: 
+        raise Exception("Model not recognised.")
         
     # Initialize model with the trial’s hyperparameters
     # Loss and optimizer

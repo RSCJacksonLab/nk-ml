@@ -47,11 +47,13 @@ def run_hparam_opt():
     ALPHABET_LEN = len(AA_ALPHABET)
     K_VALUES_TO_LOAD = range(SEQ_LEN)
     REPLICATES = 1 #we only optimise hyperparameters on a single set of replicates for computational efficiency
-    N_TRIALS_MULTIPLIER = 10
+    N_TRIALS_MULTIPLIER = 15 #we use a multiplier -- the larger the hparam space, the more trials 
+    PATIENCE = 20
+    MIN_DELTA = 1e-6
     learning_rates = [0.01, 0.001, 0.0001]
     batch_sizes    = [32, 64, 128, 256]
 
-    n_epochs = 100
+    n_epochs = 300
     
     LINEAR_HPARAMS_SPACE = {'learning_rate': learning_rates, 'batch_size': batch_sizes, 
                            'alphabet_size':ALPHABET_LEN, 'sequence_length':SEQ_LEN} 
@@ -67,15 +69,15 @@ def run_hparam_opt():
                            'kernel_sizes_max':5}
 
     uLSTM_HPARAM_SPACE   = {'learning_rate': learning_rates, 'batch_size': batch_sizes, 
-                            'alphabet_size':ALPHABET_LEN, 'max_lstm_layers': 4, 'hidden_sizes': [64, 128, 256, 512], 
+                            'alphabet_size':ALPHABET_LEN, 'max_lstm_layers': 2, 'hidden_sizes': [64, 128, 256], 
                            'bidirectional':False}
 
     bLSTM_HPARAM_SPACE   = {'learning_rate': learning_rates, 'batch_size': batch_sizes, 
-                            'alphabet_size':ALPHABET_LEN, 'max_lstm_layers': 4, 'hidden_sizes': [64, 128, 256, 512], 
+                            'alphabet_size':ALPHABET_LEN, 'max_lstm_layers': 2, 'hidden_sizes': [64, 128, 256], 
                             'bidirectional':True}
 
     TRANS_HPARAM_SPACE   = {'learning_rate': learning_rates, 'batch_size': batch_sizes, 
-                            'alphabet_size':ALPHABET_LEN,'embed_dim_options':[16, 32, 64, 128, 256],                                       'max_heads':8, 'max_layers':4, 'feedforward_dims': [32, 64, 128, 256], 
+                            'alphabet_size':ALPHABET_LEN,'embed_dim_options':[ 32, 64, 128, 256],                                       'max_heads':8, 'max_layers':2, 'feedforward_dims': [32, 64, 128, 256], 
                             'max_seq_lengths':[6, 8, 10]}
 
 
@@ -116,7 +118,6 @@ def run_hparam_opt():
     hparam_list = [LINEAR_HPARAMS_SPACE, MLP_HPARAM_SPACE, CNN_HPARAM_SPACE, uLSTM_HPARAM_SPACE, bLSTM_HPARAM_SPACE, TRANS_HPARAM_SPACE]
 
 
-
     
 
     print('Running studies...')
@@ -126,12 +127,8 @@ def run_hparam_opt():
 
     for model_index, model_name in enumerate(model_names): 
         print(Fore.GREEN + 'Optimising hyperparameters for model: {}'.format(model_name) + Fore.RESET)
-       
-        
-        
+                      
         t1 = time.time()
-
-
 
         for study_index, study in enumerate(studies[model_name]):
             #study index loops over K values for each model 
@@ -149,14 +146,16 @@ def run_hparam_opt():
                 n_trials = (len(hparam_list[model_index])-2)*N_TRIALS_MULTIPLIER
                 model = models[model_index]
                 study.optimize(lambda trial: objective_NK(trial, hparam_list[model_index], model,  
-                    train_data= xy_train[study_index], val_data=xy_val[study_index], n_epochs=n_epochs, device=device), n_trials=n_trials)
+                    train_data= xy_train[study_index], val_data=xy_val[study_index], n_epochs=n_epochs, device=device, patience=PATIENCE, min_delta=MIN_DELTA), n_trials=n_trials)
+            with open('../hyperopt/results/NK_hyperopt_results.pkl', 'wb') as handle: #write file as you go for each study 
+                pickle.dump(studies, handle,protocol=pickle.HIGHEST_PROTOCOL )
+        
         t2 = time.time()
         times[model_name]=(t2-t1)
 
 
 
-    with open('../hyperopt/results/NK_hyperopt_results.pkl', 'wb') as handle: 
-        pickle.dump(studies, handle,protocol=pickle.HIGHEST_PROTOCOL )
+
 
     with open('../hyperopt/results/NK_hyperopt_results_times.pkl', 'wb') as handle: 
         pickle.dump(times, handle,protocol=pickle.HIGHEST_PROTOCOL )
