@@ -15,8 +15,8 @@ from torch.utils.data import DataLoader
 
 
 
-from architectures import SequenceRegressionCNN, SequenceRegressionLinear, SequenceRegressionMLP, SequenceRegressionLSTM, SequenceRegressionTransformer 
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from src.architectures import SequenceRegressionCNN, SequenceRegressionLinear, SequenceRegressionMLP, SequenceRegressionLSTM, SequenceRegressionTransformer 
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, HistGradientBoostingRegressor
 from sklearn.metrics import mean_squared_error
 
 
@@ -63,6 +63,7 @@ def optimise_hparams(trial, model, loss_fn, optimizer, train_dataloader, val_dat
     early_stopping = EarlyStoppingHparamOpt(patience=patience, min_delta=min_delta)
     model.to(device)
 
+    epoch_val_losses = []
     for epoch in range(n_epochs):
         model.train()
 
@@ -87,6 +88,7 @@ def optimise_hparams(trial, model, loss_fn, optimizer, train_dataloader, val_dat
 
         val_loss /= len(val_dataloader)     
 
+        epoch_val_losses.append(val_loss)
         #report to optuna 
         trial.report(val_loss, epoch)
         print('Epoch: {0}, Val loss: {1}'.format(epoch, val_loss))
@@ -100,6 +102,8 @@ def optimise_hparams(trial, model, loss_fn, optimizer, train_dataloader, val_dat
         if trial.should_prune():
             raise opt.TrialPruned()
     print('Best validation loss this trial: {}'.format(val_loss))
+    trial.set_user_attr("epoch_validation_losses", epoch_val_losses)
+    trial.set_user_attr("n_epochs", len(epoch_val_losses))
     return val_loss
         
 
@@ -115,6 +119,8 @@ def generate_valid_combinations_transformer(embed_dim_options, max_heads):
 
 def objective_NK(trial, h_param_search_space, model, train_data, val_data, n_epochs=30, patience=5, min_delta=1e-5, device='cuda'):
     """
+    TO DO: switch to model_name instance of model for identification of model!!!
+    
     High-level function to perform hyperparameter optimisation on models. Define the search space in h_param_search_space (dict) 
     by specifying model parameter names as keys, and values as optuna trial samplers. Please also specify model parameters needed 
     for instantiation but that are not being optimised (otherwise model will return error). 
@@ -135,29 +141,29 @@ def objective_NK(trial, h_param_search_space, model, train_data, val_data, n_epo
     learning_rate = trial.suggest_categorical('lr', hpss['learning_rate'])
     batch_size    = trial.suggest_categorical('batch_size', hpss['batch_size'])
     print(model) 
-    if model==SequenceRegressionLinear:
+    if model==SequenceRegressionLinear: #TO DO: switch to model_name instance of model for identification of model
         print (model)
         model_instance = model(alphabet_size=hpss['alphabet_size'], sequence_length=hpss['sequence_length'])
         
-    elif model==SequenceRegressionMLP:
+    elif model==SequenceRegressionMLP: #TO DO: switch to model_name instance of model for identification of model
         n_hidden_layers = trial.suggest_int('n_hidden_layers',1, hpss['max_hidden_layers']) #max_hidden_sizes should be an int
         hidden_sizes    = [int(trial.suggest_categorical("hidden{}_size".format(i), hpss['hidden_sizes_categorical'])) #hidden_sizes_categorical should be a list of hidden sizes
                             for i in range(n_hidden_layers)]
         model_instance = model(alphabet_size=hpss['alphabet_size'], sequence_length=hpss['sequence_length'], hidden_sizes=hidden_sizes)
 
-    elif model==SequenceRegressionCNN:
+    elif model==SequenceRegressionCNN: #TO DO: switch to model_name instance of model for identification of model
         num_conv_layers = trial.suggest_int('num_conv_layers', 1, hpss['max_conv_layers']) #max_conv_layers should be an int
         n_kernels = [int(trial.suggest_int("n_kernels_layer{}".format(i), hpss['n_kernels_min'], hpss['n_kernels_max'] , hpss['n_kernels_step']))for i in range(num_conv_layers)]      
         kernel_sizes = [int(trial.suggest_int("kernel_size_layer{}".format(i), hpss['kernel_sizes_min'], hpss['kernel_sizes_max'], 2))for i in range(num_conv_layers)]
         model_instance = model(input_channels=hpss['alphabet_size'], sequence_length=hpss['sequence_length'], num_conv_layers=num_conv_layers,
                               n_kernels=n_kernels, kernel_sizes=kernel_sizes)
-    elif model==SequenceRegressionLSTM: 
+    elif model==SequenceRegressionLSTM: #TO DO: switch to model_name instance of model for identification of model
         num_layers     = trial.suggest_int('num_layers', 1, hpss['max_lstm_layers']) #max_lstm_layers should be int
         hidden_size    = trial.suggest_categorical("hidden_size", hpss['hidden_sizes']) #hidden_sizes should be a list of possible hidden layuer sizes
         bidirectional  = hpss['bidirectional']               
         model_instance = model(input_size=hpss['alphabet_size'], hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional)
     
-    elif model==SequenceRegressionTransformer:
+    elif model==SequenceRegressionTransformer: #TO DO: switch to model_name instance of model for identification of model
         embed_dim_options = hpss['embed_dim_options']
         max_heads = hpss['max_heads']
         valid_combinations = generate_valid_combinations_transformer(embed_dim_options, max_heads)
@@ -205,6 +211,10 @@ def sklearn_objective_NK(trial, model_name, x_train, y_train, x_val, y_val):
         model        = RandomForestRegressor(max_features=max_features, n_estimators=n_estimators, 
                                              max_depth=max_depth, n_jobs=-1)
     elif model_name=='GB': 
+        #learning_rate = trial.suggest_float('learning_rate', 0.001, 0.2)
+        #max_iter      = trial.suggest_int('max_iter', 10, 1000)
+        #max_leaf_nodes = trial.suggest_int('max_leaf_nodes', 2, 100)
+        
         max_depth     = trial.suggest_int('max_depth', 1, 32)
         n_estimators  = trial.suggest_int('n_estimators', 10, 1000)
         learning_rate = trial.suggest_float('learning_rate', 0.001, 0.2) 

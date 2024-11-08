@@ -244,14 +244,40 @@ def train_models_from_hparams_NK(hparams_path, datapath, model_savepath, result_
                 
             #update results dictionary 
             results[model_name][k_index] = k_results 
-    with open(result_path+'/NK_train_test_results.pkl', 'wb') as handle:
-        pickle.dump(results, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            with open(result_path+'/NK_train_test_results.pkl', 'wb') as handle: #overwrite results at each model k value
+                pickle.dump(results, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     
     print('Training and testing finished. Results written to disk.')
     return results      
 
-                    
+def instantiate_model_from_study(model_name, study, alphabet_size=6, seq_length=6): 
+    if model_name == 'linear':
+        model_instance = SequenceRegressionLinear(alphabet_size=alphabet_size, sequence_length=seq_length)
+    elif model_name == 'mlp': 
+        hparams = read_MLP_hparams(study.best_params)
+        model_instance = SequenceRegressionMLP(**hparams, alphabet_size=alphabet_size, sequence_length=seq_length)
+    elif model_name == 'cnn': 
+        hparams = read_CNN_hparams(study.best_params)
+        model_instance = SequenceRegressionCNN(**hparams, input_channels=alphabet_size, sequence_length=seq_length)
+    elif model_name == 'ulstm': 
+        hparams = read_LSTM_hparams(study.best_params)
+        model_instance = SequenceRegressionLSTM(**hparams, input_size=alphabet_size, bidirectional=False)
+    elif model_name == 'blstm': 
+        hparams = read_LSTM_hparams(study.best_params)
+        model_instance = SequenceRegressionLSTM(**hparams, input_size=alphabet_size, bidirectional=True)
+    elif model_name == 'transformer': 
+        hparams = read_transformer_hparams(study.best_params)
+        model_instance = SequenceRegressionTransformer(**hparams, input_dim=alphabet_size)
+    elif model_name == 'RF': 
+        hparams = study.best_params
+        model_instance = RandomForestRegressor(**hparams)
+    elif model_name == 'GB': 
+        hparams = study.best_params
+        model_instance = GradientBoostingRegressor(**hparams)
+    else: 
+        raise Exception('Unknown model name.')
+    return model_instance                  
 
 
 

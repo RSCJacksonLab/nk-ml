@@ -47,14 +47,14 @@ def run_hparam_opt():
     ALPHABET_LEN = len(AA_ALPHABET)
     K_VALUES_TO_LOAD = range(SEQ_LEN)
     REPLICATES = 1 #we only optimise hyperparameters on a single set of replicates for computational efficiency
-    #N_TRIALS_MULTIPLIER = 1 #15 #we use a multiplier -- the larger the hparam space, the more trials 
-    PATIENCE = 5 #20
+    N_TRIALS_MULTIPLIER = 15 #15 #we use a multiplier -- the larger the hparam space, the more trials 
+    PATIENCE = 20
     MIN_DELTA = 1e-6
     learning_rates = [0.01, 0.001, 0.0001]
     batch_sizes    = [32, 64, 128, 256]
 
-    N_TRIALS = 1
-    n_epochs = 5#300
+    #N_TRIALS = 64
+    n_epochs = 300
     
     LINEAR_HPARAMS_SPACE = {'learning_rate': learning_rates, 'batch_size': batch_sizes, 
                            'alphabet_size':ALPHABET_LEN, 'sequence_length':SEQ_LEN} 
@@ -139,12 +139,12 @@ def run_hparam_opt():
 
             if model_name=='RF' or model_name=='GB': 
                 
-                n_trials = N_TRIALS#3*N_TRIALS_MULTIPLIER
+                n_trials = 3*N_TRIALS_MULTIPLIER
                 study.optimize(lambda trial: sklearn_objective_NK(trial, model_name, x_train=x_train_np[study_index], y_train=y_train_np[study_index].ravel(), 
                     x_val=x_val_np[study_index], y_val=y_val_np[study_index].ravel()), n_trials=n_trials )
 
             else:
-                n_trials = N_TRIALS #(len(hparam_list[model_index])-2)*N_TRIALS_MULTIPLIER
+                n_trials = (len(hparam_list[model_index])-2)*N_TRIALS_MULTIPLIER
                 model = models[model_index]
                 study.optimize(lambda trial: objective_NK(trial, hparam_list[model_index], model,  
                     train_data= xy_train[study_index], val_data=xy_val[study_index], n_epochs=n_epochs, device=device, patience=PATIENCE, min_delta=MIN_DELTA), n_trials=n_trials)

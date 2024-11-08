@@ -24,7 +24,6 @@ from pscapes.utils import dict_to_np_array, np_array_to_dict
 from architectures import SequenceRegressionCNN, SequenceRegressionLinear, SequenceRegressionMLP, SequenceRegressionLSTM, SequenceRegressionTransformer
 
 from ml_utils import train_val_test_split_ohe, landscapes_ohe_to_numpy
-from hyperopt import objective_NK, sklearn_objective_NK
 
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor 
 
@@ -40,10 +39,10 @@ DATA_PATH = '../data/nk_landscapes/'
 MODEL_SAVEPATH = '../models/'
 RESULT_PATH = '../results/'
 
-N_EPOCHS = 100
-N_REPLICATES = 1
+N_EPOCHS = 300
+N_REPLICATES = 4
 
-PATIENCE = 5
+PATIENCE = 20
 MIN_DELTA = 1e-6
 
 

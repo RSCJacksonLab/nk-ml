@@ -9,11 +9,11 @@ from scipy.sparse import diags
 import sys
 sys.path.append('../../pscapes')
 sys.path.append('../../nk-ml-2024/')
+from scipy.sparse.linalg import eigsh
 
-from src.architectures import SequenceRegressionCNN, SequenceRegressionLSTM, SequenceRegressionMLP, SequenceRegressionLinear, SequenceRegressionTransformer
+import numpy as np
 
 
-from src.train_utils import read_CNN_hparams, read_MLP_hparams, read_LSTM_hparams, read_transformer_hparams
 
 def get_latent_representation(model, model_name,  x_data):
     # Variable to store the final layer activation
@@ -32,7 +32,9 @@ def get_latent_representation(model, model_name,  x_data):
         final_layer = list(model.children())[-2] #gets the final MaxPool1d layer 
         hook_handle = final_layer.register_forward_hook(forward_hook)
     elif model_name == 'ulstm': 
-        final_layer = 
+        hook_handle = model.lstm.register_forward_hook(forward_hook)
+    else: 
+        raise Exception('Model name not recognised.')
 
     # Run a forward pass
     _ = model(x_data)
@@ -43,52 +45,38 @@ def get_latent_representation(model, model_name,  x_data):
     # Return the captured activation
     return final_activation.detach()
 
-def instantiate_model_from_study(model_name, study, alphabet_size=6, seq_length=6): 
-    if model_name == 'linear':
-        model_instance = SequenceRegressionLinear(alphabet_size=alphabet_size, sequence_length=seq_length)
-    elif model_name == 'mlp': 
-        hparams = read_MLP_hparams(study.best_params)
-        model_instance = SequenceRegressionMLP(**hparams, alphabet_size=alphabet_size, sequence_length=seq_length)
-    elif model_name == 'cnn': 
-        hparams = read_CNN_hparams(study.best_params)
-        model_instance = SequenceRegressionCNN(**hparams, input_channels=alphabet_size, sequence_length=seq_length)
-    elif model_name == 'ulstm': 
-        hparams = read_LSTM_hparams(study.best_params)
-        model_instance = SequenceRegressionLSTM(**hparams, input_size=alphabet_size, bidirectional=False)
-    elif model_name == 'blstm': 
-        hparams = read_LSTM_hparams(study.best_params)
-        model_instance = SequenceRegressionLSTM(**hparams, input_size=alphabet_size, bidirectional=True)
-    elif model_name == 'transformer': 
-        hparams = read_transformer_hparams(study.best_params)
-        model_instance = SequenceRegressionTransformer(**hparams, input_dim=alphabet_size)
-    elif model_name == 'RF': 
-        hparams = study.best_params
-        model_instance = RandomForestRegressor(**hparams)
-    elif model_name == 'GB': 
-        hparams = study.best_params
-        model_instance = GradientBoostingRegressor(**hparams)
-    else: 
-        raise Exception('Unknown model name.')
-    return model_instance
-
-
-
+def check_negative_entries(A):
+    if A.min() < 0:
+        raise ValueError("Adjacency matrix contains negative entries.")
+def check_symmetry(A):
+    if (A != A.T).nnz != 0:
+        raise ValueError("Adjacency matrix is not symmetric.")
 
 def adjacency_to_diag_laplacian(A): 
     """
-    Calculates degree and laplacian matrices from an adjacency matrix.  
+    Calculates degree and Laplacian matrices from an adjacency matrix.  
     
     Args: 
         A (scipy sparse matrix): adjacency of graph
     Returns: 
         D (scipy sparse matrix): degree matrix of graph
-        L (scipy sparse matrix) : laplacian matrix of graph
+        L (scipy sparse matrix): Laplacian matrix of graph
     """
-    degrees = A.sum(axis=1).A1
-    D = diags(degrees, format='csr')
-    L = D-A
-
+    # Check for negative entries in A
+    if A.min() < 0:
+        raise ValueError("Adjacency matrix has negative values.")
     
+    # Ensure A is symmetric
+    if (A != A.T).nnz != 0:
+        raise ValueError("Adjacency matrix is not symmetric for an undirected graph.")
+    
+    degrees = np.array(A.sum(axis=1)).flatten()
+    # Check for negative degrees
+    if degrees.min() < 0:
+        raise ValueError("Degree matrix has negative values.")
+    
+    D = diags(degrees, format='csr')
+    L = D - A
     return D, L
 
 def sparse_dirichlet(L, f): 
@@ -96,13 +84,31 @@ def sparse_dirichlet(L, f):
     Calculates the Dirichlet energy of a signal f over a graph. 
     
     Args: 
-    L (scipy sparse matrix): graph laplacian
-    f (np array): signal over graph
+        L (scipy sparse matrix): graph Laplacian
+        f (np array): signal over graph
     """
+    f = f.astype('float64')
+    L = L.astype('float64')
 
+    #min_eigval = eigsh(L, k=1, which='SA', return_eigenvectors=False)[0]
+    #if min_eigval < -1e-10:
+        #raise ValueError("Laplacian matrix is not positive semi-definite.")
+
+    
+    Lf = L.dot(f)
+    fLf = f.T @ Lf  # Ensures matrix-vector product
+
+    # Allow for minor numerical errors
+    tol = 1e-10
+    if fLf < -tol:
+        raise ValueError(f"Dirichlet energy is negative: {fLf}")
+
+    return fLf.item()
+
+    """
     f = f.astype('float64') 
     Lf  = L.dot(f)
     f_T = f.T
     fLf = f_T.dot(Lf)
-    return fLf.item()
+    return fLf.item()"""
     
