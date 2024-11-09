@@ -53,7 +53,7 @@ def read_transformer_hparams(best_params):
     return param_dict
     
     
-def train_models_from_hparams_NK(hparams_path, datapath, model_savepath, result_path, amino_acids, seq_length, 
+def train_models_from_hparams_NK(hparams_dict, datapath, model_savepath, result_path, amino_acids, seq_length, 
                                  n_replicates, n_epochs=30, patience=5, min_delta=1e-5):
     """
     Performs training of a given model with a given set of hyperparameters against NK landscapes replicates. 
@@ -70,8 +70,7 @@ def train_models_from_hparams_NK(hparams_path, datapath, model_savepath, result_
     """
     
 
-    with open(hparams_path, 'rb') as handle:
-        hparam_studies = pickle.load(handle)
+    hparam_studies = hparams_dict
 
     
 
@@ -95,6 +94,8 @@ def train_models_from_hparams_NK(hparams_path, datapath, model_savepath, result_
     results = {}
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    
 
     
     #loop over models 

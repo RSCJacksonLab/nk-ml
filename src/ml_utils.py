@@ -5,14 +5,13 @@ from torch.utils.data import DataLoader
 
 import numpy as np
 from sklearn.model_selection import train_test_split
+import os
 
 
-
-import torch
 
 
 class EarlyStopping:
-    def __init__(self, patience=5, min_delta=0.0, path='best_model.pt'):
+    def __init__(self, patience=5, min_delta=0.0, path='best_model_{}.pt'):
         """
         Args:
             patience (int): How long to wait after last time validation loss improved.
@@ -21,11 +20,14 @@ class EarlyStopping:
         """
         self.patience = patience
         self.min_delta = min_delta
-        self.path = path
+        
+        
+        self.path = path.format(np.random.randint(10000000,100000000 ))
         self.counter = 0
         self.best_loss = None
         self.early_stop = False
 
+        
     def __call__(self, val_loss, model):
         if self.best_loss is None:
             self.best_loss = val_loss
@@ -48,9 +50,12 @@ def train_model(model, optimizer, loss_fn, train_loader, val_loader, n_epochs=30
     model = model.to(device)
     val_epoch_losses = []
     train_epoch_losses = []
+
+    assert n_epochs>0, 'n_epochs not strictly greater than 0, ensure n_epochs > 0'
     
     for epoch in range(n_epochs):
         model.train()  # Training mode
+        
         train_loss = 0.0
         for x_batch, y_batch in train_loader:
             x_batch, y_batch = x_batch.to(device), y_batch.to(device)
@@ -96,6 +101,13 @@ def train_model(model, optimizer, loss_fn, train_loader, val_loader, n_epochs=30
 
     # Load the best model after early stopping
     model.load_state_dict(torch.load(early_stopping.path))
+
+    #delete best model from early stopiig from disk 
+    if os.path.exists(early_stopping.path):
+      os.remove(early_stopping.path)
+    else:
+      print("The file does not exist")
+        
     return model, train_epoch_losses, val_epoch_losses
 
 

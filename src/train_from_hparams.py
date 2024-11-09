@@ -51,10 +51,13 @@ def main():
     with open(HPARAM_PATH, 'rb') as handle: 
         NK_hparams = pickle.load(handle)
     
-    
+    trans_RF_GB = {}
+    trans_RF_GB['transformer'] = NK_hparams['transformer']
+    trans_RF_GB['RF'] = NK_hparams['RF']
+    trans_RF_GB['GB'] = NK_hparams['GB']
     
     print('Training models on best hyperparameters.')
-    res = train_models_from_hparams_NK(HPARAM_PATH, DATA_PATH, model_savepath=MODEL_SAVEPATH, result_path=RESULT_PATH,
+    res = train_models_from_hparams_NK(trans_RF_GB, DATA_PATH, model_savepath=MODEL_SAVEPATH, result_path=RESULT_PATH,
                                      amino_acids=AA_ALPHABET, 
                                      seq_length=SEQ_LEN, n_replicates=N_REPLICATES, n_epochs=N_EPOCHS, patience=PATIENCE, min_delta=MIN_DELTA) 
     

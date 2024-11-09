@@ -1,0 +1,1 @@
+this directory contains models that were trained using hyperparameters at K=3 only. I.e. each model has the hyperparameters at K=3, and then the models are trained/tested on K=1 to K=5, 4 replicates. This is to see if model architecture affects dirichlet energy, and to remove the confounding variable of model architecture. 
