@@ -79,6 +79,8 @@ def adjacency_to_diag_laplacian(A):
     L = D - A
     return D, L
 
+
+
 def sparse_dirichlet(L, f): 
     """
     Calculates the Dirichlet energy of a signal f over a graph. 
@@ -104,6 +106,26 @@ def sparse_dirichlet(L, f):
         raise ValueError(f"Dirichlet energy is negative: {fLf}")
 
     return fLf.item()
+
+
+def dirichlet_from_representation(rep_tensor, y_data, degree=30, n_jobs=-1): 
+    """
+    Constructs a kNN graph from the representation of a model, and computes the dirichlet energy of the 
+    signal y over that kNN. 
+    Args: 
+        rep_tensor (torch.tensor):        torch tensor of shape ()
+        y_data (np.array):                np array containing y_data of shape (n_samples, 1) or (n_samples,)
+        degree (int):                     degree of the kNN graph
+    Returns: 
+        dirichlet_energy (float)    
+    """
+    A = kneighbors_graph(rep_tensor, n_neighbors=degree, n_jobs=n_jobs) #compute adjacency
+    A = A.maximum(A.T) #ensure A is symmetric 
+    L = adjacency_to_diag_laplacian(A)[1] #compute laplacian 
+    dirichlet_energy = sparse_dirichlet(L, y_data)
+    
+    return dirichlet_energy
+    
 
     """
     f = f.astype('float64') 
