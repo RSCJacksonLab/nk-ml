@@ -84,7 +84,7 @@ def run_hparam_opt_GB1():
     
     LANDSCAPES = [landscape.fit_OHE()]
     
-    landscapes_ohe, xy_train, xy_val, xy_test, x_test, y_test = train_val_test_split_ohe(LANDSCAPES, test_split=0.75, val_split=0.2, random_state=1)
+    landscapes_ohe, xy_train, xy_val, xy_test, x_test, y_test = train_val_test_split_ohe(LANDSCAPES, test_split=0.2, val_split=0.2, random_state=1)
     
     model_names = ['linear', 'mlp', 'cnn', 'ulstm', 'blstm', 'transformer', 'RF', 'GB']
     study_list = [[opt.create_study(direction='minimize') for i in LANDSCAPES] for j in model_names]
@@ -126,7 +126,7 @@ def run_hparam_opt_GB1():
                 model = models[model_index]
                 study.optimize(lambda trial: objective_NK(trial, hparam_list[model_index], model,  
                     train_data= xy_train[study_index], val_data=xy_val[study_index], n_epochs=n_epochs, device=device, patience=PATIENCE, min_delta=MIN_DELTA), n_trials=n_trials)
-            with open('../hyperopt/results/GB1_hyperopt_results.pkl', 'wb') as handle: #write file as you go for each study 
+            with open('../hyperopt/results/GB1_hyperopt_results_large_train.pkl', 'wb') as handle: #write file as you go for each study 
                 pickle.dump(studies, handle,protocol=pickle.HIGHEST_PROTOCOL )
         
         t2 = time.time()
@@ -137,7 +137,7 @@ def run_hparam_opt_GB1():
         mins = t/60
         print('Model:{} took {} mins to optimise hyperparameters'.format(model_name, mins) )
         
-    print('Hyperparameter optimisation for GB1 complete.')
+    print('Hyperparameter optimisation for GB1 large train complete.')
     
     
 if __name__ == "__main__":

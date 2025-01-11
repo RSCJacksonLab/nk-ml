@@ -43,12 +43,12 @@ def run_hparam_opt_GB1():
     ALPHABET_LEN = len(AA_ALPHABET)
     #K_VALUES_TO_LOAD = range(SEQ_LEN)       
     REPLICATES = 1 #we only optimise hyperparameters on a single set of replicates for computational efficiency
-    N_TRIALS_MULTIPLIER = 1 #15 #we use a multiplier -- the larger the hparam space, the more trials 
+    N_TRIALS_MULTIPLIER = 10 #15 #we use a multiplier -- the larger the hparam space, the more trials 
     PATIENCE = 15
     MIN_DELTA = 1e-5
     learning_rates = [0.01, 0.001, 0.0001]
     batch_sizes    = [32, 64, 128, 256]
-    n_epochs = 300
+    n_epochs = 150
     
     
     
@@ -124,7 +124,6 @@ def run_hparam_opt_GB1():
             else:
                 n_trials = (len(hparam_list[model_index])-2)*N_TRIALS_MULTIPLIER
                 model = models[model_index]
-                print(model)
                 study.optimize(lambda trial: objective_NK(trial, hparam_list[model_index], model,  
                     train_data= xy_train[study_index], val_data=xy_val[study_index], n_epochs=n_epochs, device=device, patience=PATIENCE, min_delta=MIN_DELTA), n_trials=n_trials)
             with open('../hyperopt/results/GB1_hyperopt_results.pkl', 'wb') as handle: #write file as you go for each study 
