@@ -15,6 +15,7 @@ class SequenceRegressionLinear(nn.Module):
         super(SequenceRegressionLinear, self).__init__()
         self.alphabet_size   = alphabet_size
         self.sequence_length = sequence_length
+        self.model_name = 'linear'
 
         input_size = self.alphabet_size*self.sequence_length
 
@@ -34,6 +35,7 @@ class SequenceRegressionMLP(nn.Module):
 
         self.alphabet_size = alphabet_size
         self.sequence_length = sequence_length
+        self.model_name = 'mlp'
 
         input_size = alphabet_size * sequence_length
 
@@ -94,6 +96,7 @@ class SequenceRegressionCNN(nn.Module):
         self.pool = nn.MaxPool1d(pool_kernel_size)
         self.pool_every = pool_every
 
+        self.model_name = 'cnn'
     
 
 
@@ -162,6 +165,7 @@ class SequenceRegressionLSTM(nn.Module):
         # Define the output layer that maps LSTM output to a single real number
         self.output_layer = nn.Linear(hidden_size * self.num_directions, 1)
 
+        self.model_name = 'ulstm' if self.bidirectional==False else 'blstm'
     def forward(self, x):
         # Initialize hidden and cell states for LSTM
         h0 = torch.zeros(self.num_layers * self.num_directions, x.size(0), self.hidden_size).to(x.device)
@@ -214,7 +218,7 @@ class SequenceRegressionTransformer(nn.Module):
         
         # Fully connected output layer for regression
         self.fc_out = nn.Linear(d_model, 1)
-    
+        self.model_name = 'transformer'
     def forward(self, x):
         # x shape: (batch_size, sequence_length, input_dim)
         

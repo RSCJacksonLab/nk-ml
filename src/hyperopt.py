@@ -6,7 +6,7 @@ import torch.optim as optim
 import numpy as np
 import sys
 sys.path.append('../../pscapes')
-sys.path.append('../../nk-ml-2024')
+sys.path.append('../../nk-2025')
 sys.path.append('./')
 
 
@@ -16,11 +16,12 @@ from torch.utils.data import DataLoader
 
 
 from src.architectures import SequenceRegressionCNN, SequenceRegressionLinear, SequenceRegressionMLP, SequenceRegressionLSTM, SequenceRegressionTransformer 
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, HistGradientBoostingRegressor
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.metrics import mean_squared_error
 
 
 torch.backends.nnpack.enabled = False
+
 
 
 class EarlyStoppingHparamOpt:

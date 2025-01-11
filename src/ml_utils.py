@@ -216,10 +216,13 @@ def train_model_no_early_stopping(model, optimizer, loss_fn, train_loader, n_epo
     
 
 def train_val_test_split_ohe(landscapes, test_split=0.2, val_split=0.2, random_state=1): 
-    """Args: FIX THIS FUNCTION TO MAKE FASTER AND NEATER BEFORE PUBLICATION
+    """Performs train-test-val splitting of data using a list of protein landscape class objects. NOTE: validation data 
+        proportion is proportion of TRAIN data NOT total data. 
+    
+    Args: FIX THIS FUNCTION TO MAKE FASTER AND NEATER BEFORE PUBLICATION
             landscapes (list): List of Protein_Landscape class objects
-            test_split (float [0,1]): proportion of total data used for testing
-            val_split (float [0,1]): proportion of train data used for validation
+            test_split (float): proportion of total data used for testing
+            val_split (float): proportion of TRAIN data used for validation (NOT total data)
             random_state (int):      controls random state of sklearn train_test_split for reproducible splits. Default 1. """
     LANDSCAPES_OHE = [np.array(i.one_hot_encodings) for i in landscapes]
     X_OHE = LANDSCAPES_OHE

@@ -21,7 +21,7 @@ from torch.utils.data import DataLoader
 from pscapes.landscape_class import ProteinLandscape
 from pscapes.utils import dict_to_np_array, np_array_to_dict
 
-from architectures import SequenceRegressionCNN, SequenceRegressionLinear, SequenceRegressionMLP, SequenceRegressionLSTM, SequenceRegressionTransformer
+from src.architectures import SequenceRegressionCNN, SequenceRegressionLinear, SequenceRegressionMLP, SequenceRegressionLSTM, SequenceRegressionTransformer
 
 from ml_utils import train_val_test_split_ohe, landscapes_ohe_to_numpy
 from hyperopt import objective_NK, sklearn_objective_NK
