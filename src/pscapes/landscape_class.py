@@ -5,6 +5,7 @@ Modification of code from https://github.com/acmater/NK_Benchmarking/
     * Formatting changes
     * Added optional use for benchmarking models trained on OHE rather
     than tokenization
+    * Updated data splitting to be deterministic
 '''
 import copy
 import multiprocessing as mp
@@ -148,6 +149,7 @@ class ProteinLandscape():
                                          "index_col": None},
                 amino_acids: str='ACDEFGHIKLMNPQRSTVWY',
                 saved_file: Optional[Path] = None,
+                save_as_ohe: bool = False,
                 ):
         
         if saved_file is not None:
@@ -212,7 +214,10 @@ class ProteinLandscape():
         self.max_distance = max(subsets.keys())
         self.d_data = subsets
 
-        self.graph = self.build_graph()
+        if not graph:
+            self.graph = self.build_graph()
+        else:
+            self.graph = graph
         self.num_minima,self.num_maxima = self.calculate_num_extrema()
         self.extrema_ruggedness = self.calc_extrema_ruggedness()
         (
@@ -220,6 +225,9 @@ class ProteinLandscape():
             self.linear_RMSE,
             self.RS_ruggedness,
         ) = self.rs_ruggedness()
+
+        # if processing requires ohe conversion, convert now
+        
         print(self)
 
     def seed(self):
@@ -477,7 +485,8 @@ class ProteinLandscape():
                      distance: Optional[Union[int, list]] = None,
                      positions: Optional[list] = None,
                      split: float = 0.8,
-                     shuffle: bool = True):
+                     shuffle: bool = True,
+                     random_state: Optional[int] = None):
         '''
         Parameters
         ----------
@@ -513,7 +522,7 @@ class ProteinLandscape():
             data = data
         elif distance:
             if type(distance) == int:
-                data = copy.copy(self.get_distance(distance,tokenize=True))
+                data = copy.copy(self.get_distance(distance, tokenize=True))
             else:
                 data = collapse_concat(
                     [copy.copy(self.get_distance(d, tokenize=True)) 
@@ -527,6 +536,9 @@ class ProteinLandscape():
             data = copy.copy(self.tokenized)
 
         if shuffle:
+            # assign random state if provided
+            if random_state is not None:
+                np.random.seed(random_state)
             np.random.shuffle(data)
 
         split_point = int(len(data)*split)
