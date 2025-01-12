@@ -24,7 +24,7 @@ from pscapes.utils import dict_to_np_array, np_array_to_dict
 from src.architectures import SequenceRegressionCNN, SequenceRegressionLinear, SequenceRegressionMLP, SequenceRegressionLSTM, SequenceRegressionTransformer
 
 from ml_utils import train_val_test_split_ohe, landscapes_ohe_to_numpy
-from hyperopt import objective_NK, sklearn_objective_NK
+from hyperopt import objective, sklearn_objective
 
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor 
 from colorama import Fore
@@ -56,6 +56,8 @@ def run_hparam_opt():
     #N_TRIALS = 64
     n_epochs = 300
     
+
+    #define hyperparameter search space 
     LINEAR_HPARAMS_SPACE = {'learning_rate': learning_rates, 'batch_size': batch_sizes, 
                            'alphabet_size':ALPHABET_LEN, 'sequence_length':SEQ_LEN} 
     
@@ -140,15 +142,15 @@ def run_hparam_opt():
             if model_name=='RF' or model_name=='GB': 
                 
                 n_trials = 3*N_TRIALS_MULTIPLIER
-                study.optimize(lambda trial: sklearn_objective_NK(trial, model_name, x_train=x_train_np[study_index], y_train=y_train_np[study_index].ravel(), 
+                study.optimize(lambda trial: sklearn_objective(trial, model_name, x_train=x_train_np[study_index], y_train=y_train_np[study_index].ravel(), 
                     x_val=x_val_np[study_index], y_val=y_val_np[study_index].ravel()), n_trials=n_trials )
 
             else:
                 n_trials = (len(hparam_list[model_index])-2)*N_TRIALS_MULTIPLIER
                 model = models[model_index]
-                study.optimize(lambda trial: objective_NK(trial, hparam_list[model_index], model,  
+                study.optimize(lambda trial: objective(trial, hparam_list[model_index], model,  
                     train_data= xy_train[study_index], val_data=xy_val[study_index], n_epochs=n_epochs, device=device, patience=PATIENCE, min_delta=MIN_DELTA), n_trials=n_trials)
-            with open('../hyperopt/results/NK_hyperopt_results.pkl', 'wb') as handle: #write file as you go for each study 
+            with open('../hyperopt/results/NK_hyperopt_results.pkl', 'wb') as handle: #rewrite file as you go for each study 
                 pickle.dump(studies, handle,protocol=pickle.HIGHEST_PROTOCOL )
         
         t2 = time.time()

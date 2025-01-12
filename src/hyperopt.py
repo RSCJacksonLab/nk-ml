@@ -1,4 +1,5 @@
-# This file contains high-level code for hparam optimisation 
+# This file contains high-level code for hparam optimisation
+
 import optuna as opt
 import torch
 import torch.nn as nn
@@ -49,7 +50,7 @@ def optimise_hparams(trial, model, loss_fn, optimizer, train_dataloader, val_dat
 
     Args:
         trial:                                         optuna trial keyword 
-        model (src.architectures.architectures):       insantiated instance of model() with appropriate parameters
+        model (src.architectures):                     insantiated instance of model() with appropriate parameters
         loss_fn (torch.nn.modules.loss):               instantiated loss function instance 
         optimizer (torch.optim):                       instantiated optimizer function instance 
         train_dataloader (torch DataLoader):           DataLoader with train data
@@ -109,6 +110,17 @@ def optimise_hparams(trial, model, loss_fn, optimizer, train_dataloader, val_dat
         
 
 def generate_valid_combinations_transformer(embed_dim_options, max_heads):
+    """
+    Function to generate valid combinations of embedding dimension and maximum number of heads. Ensures that the embedding dimension (embed_dim) can be 
+    evenly divided by the number of attention heads (num_heads).
+    
+    Args: 
+
+        embed_dim_options (list):                   list of ints, where each int is an option for the embedding dimension
+        max_heads (int):                            maximum number of attention heads to consider 
+
+    """
+
     valid_combinations = []
     
     for embed_dim in embed_dim_options:
@@ -118,23 +130,28 @@ def generate_valid_combinations_transformer(embed_dim_options, max_heads):
     
     return valid_combinations
 
-def objective_NK(trial, h_param_search_space, model, train_data, val_data, n_epochs=30, patience=5, min_delta=1e-5, device='cuda'):
+def objective(trial, h_param_search_space, model, train_data, val_data, n_epochs=30, patience=5, min_delta=1e-5, device='cuda'):
     """
-    TO DO: switch to model_name instance of model for identification of model!!!
     
     High-level function to perform hyperparameter optimisation on models. Define the search space in h_param_search_space (dict) 
     by specifying model parameter names as keys, and values as optuna trial samplers. Please also specify model parameters needed 
     for instantiation but that are not being optimised (otherwise model will return error). 
 
-    trial:                           optuna trial object
-    h_param_search_space (dict):     dict of hyperparameters {hparam_name: hparam_value}. Specify search space with optuna.trial sampler as value if 
-                                     wanting to optimise that hyperparameter. Example: {'learning_rate': trial.suggest_categorical('lr', [0.01, 0.001, 0.0001]), 'sequence_length':5 }
-    model (nn.Module):               model to optimise. Do NOT instantiate model with model() on passing.
-    train_data:                      train data
-    val_data:                        val data
-    n_epochs (int):                  number of epochs to train for 
-    patience (int):                  patience for early stopping 
-    mind_delta(float):               min_delta for early stopping   
+    Args: 
+
+        trial:                                  optuna trial object
+        h_param_search_space (dict):            dict of hyperparameters {hparam_name: hparam_value}. Specify search space with optuna.trial sampler as value if 
+                                                wanting to optimise that hyperparameter. Example: {'learning_rate': trial.suggest_categorical('lr', [0.01, 0.001, 0.0001]), 'sequence_length':5 }
+        model (nn.Module):                      model to optimise. Do NOT instantiate model with model() on passing.
+        train_data:                             train data
+        val_data:                               val data
+        n_epochs (int):                         number of epochs to train for 
+        patience (int):                         patience for early stopping 
+        mind_delta(float):                      min_delta for early stopping   
+        
+    TO DO: switch to model_name instance of model for identification of model.
+
+
     """           
 
     #define search spaces based on model
@@ -195,7 +212,7 @@ def objective_NK(trial, h_param_search_space, model, train_data, val_data, n_epo
     return val_loss
 
 
-def sklearn_objective_NK(trial, model_name, x_train, y_train, x_val, y_val):
+def sklearn_objective(trial, model_name, x_train, y_train, x_val, y_val):
     """
     model_name (str):   either 'RF' or 'GB'
     x_train(np.array):  np array of shape (samples, seq_length*alphabet_size)

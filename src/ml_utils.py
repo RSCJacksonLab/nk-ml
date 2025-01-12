@@ -13,6 +13,8 @@ import os
 class EarlyStopping:
     def __init__(self, patience=5, min_delta=0.0, path='best_model_{}.pt'):
         """
+        Class for early stopping during model training. 
+
         Args:
             patience (int): How long to wait after last time validation loss improved.
             min_delta (float): Minimum change in the monitored quantity to qualify as an improvement.
@@ -46,6 +48,24 @@ class EarlyStopping:
         torch.save(model.state_dict(), self.path)
 
 def train_model(model, optimizer, loss_fn, train_loader, val_loader, n_epochs=30, device='cpu', patience=5, min_delta=1e-5):
+    """
+    Function for training a model. 
+
+    Args:     
+        model (src.architectures):                     insantiated instance of model() with appropriate parameters
+        loss_fn (torch.nn.modules.loss):               instantiated loss function instance 
+        optimizer (torch.optim):                       instantiated optimizer function instance 
+        train_loader (torch DataLoader):               DataLoader with train data
+        val_loader (torch DataLoader):                 DataLoader with val data 
+        n_epochs (int):                                number of epochs to train unless early stopping initiated
+        patience (int):                                patience value for early stopping 
+        min_delta (float):                             min_delta change value for early stopping 
+        device (str):                                  device for PyTorch
+
+
+
+    """
+
     early_stopping = EarlyStopping(patience=patience, min_delta=min_delta)
     model = model.to(device)
     val_epoch_losses = []
@@ -113,107 +133,15 @@ def train_model(model, optimizer, loss_fn, train_loader, val_loader, n_epochs=30
 
 
 def get_trainable_params(model): 
+    """
+    Get the number of trainable parameters for a model. 
+    """
+
     pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     return pytorch_total_params
 
 
 
-def train_model_get_latent_rep(model, model_name, optimizer, loss_fn, train_loader, val_loader, n_epochs=30, device='cpu', patience=5, min_delta=1e-5, x_data=None):
-    early_stopping = EarlyStopping(patience=patience, min_delta=min_delta)
-    model = model.to(device)
-    val_epoch_losses = []
-    train_epoch_losses = []
-    epoch_latent_reps  = []
-    
-    for epoch in range(n_epochs):
-        model.train()  # Training mode
-        train_loss = 0.0
-        for x_batch, y_batch in train_loader:
-            x_batch, y_batch = x_batch.to(device), y_batch.to(device)
-            
-            optimizer.zero_grad()
-            y_pred = model(x_batch)
-            loss = loss_fn(y_pred, y_batch)
-            loss.backward()
-            optimizer.step()
-            
-            train_loss += loss.item()
-        
-        epoch_loss = train_loss/len(train_loader)
-        train_epoch_losses.append(epoch_loss)
-
-        # Validation phase
-        model.eval()
-        val_loss = 0.0
-        with torch.no_grad():
-            for inputs, targets in val_loader:
-                #print(inputs.shape)
-                #print(targets.shape)
-                inputs, targets = inputs.to(device), targets.to(device)
-                
-                outputs = model(inputs)
-                loss = loss_fn(outputs, targets)
-                val_loss += loss.item()
-        val_loss /= len(val_loader)
-        val_epoch_losses.append(val_loss)
-
-        assert x_data!=None, 'No landscape x_data provided for latent representation calculation.'
-        latent_rep  = get_latent_representation(model, model_name, x_data)
-        epoch_latent_reps.append(latent_rep)
-
-        
-            
-            
-        
-
-        print(f"Epoch [{epoch+1}/{n_epochs}], Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
-
-        # Check early stopping
-        early_stopping(val_loss, model)
-        if early_stopping.early_stop:
-            print("Early stopping triggered")
-            break
-
-    # Load the best model after early stopping
-    model.load_state_dict(torch.load(early_stopping.path))
-    return model, train_epoch_losses, val_epoch_losses, epoch_latent_reps
-
-
-
-
-
-def train_model_no_early_stopping(model, optimizer, loss_fn, train_loader, n_epochs=10, device='cpu'): 
-    model = model.to(device)  # Move model to the specified device (CPU or GPU)
-    model.train()  # Set model to training mode
-    
-    
-    epoch_losses = []
-    for epoch in range(n_epochs):
-        running_loss=0.0
-        for i, (x_batch, y_batch) in enumerate(train_loader):
-            
-            x_batch, y_batch = x_batch.to(device), y_batch.to(device)
-            y_pred = model(x_batch)
-            loss   = loss_fn(y_pred, y_batch)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            
-            # Accumulate loss for the batch
-            running_loss += loss.item()
-            
-             # Print stats every 10 batches
-            #if (i + 1) % 10 == 0:
-                #print(f"Epoch [{epoch + 1}/{n_epochs}], Batch [{i + 1}/{len(train_loader)}], Loss: {loss.item():.4f}")
-
-        # Print average loss per epoch
-        epoch_loss = running_loss / len(train_loader)
-        epoch_losses.append(epoch_loss)
-        print(f"Epoch [{epoch + 1}/{n_epochs}] Average Loss: {epoch_loss:.4f}")
-        
-    print("Training completed")
-    return epoch_losses
-    
 
 def train_val_test_split_ohe(landscapes, test_split=0.2, val_split=0.2, random_state=1): 
     """Performs train-test-val splitting of data using a list of protein landscape class objects. NOTE: validation data 
@@ -224,6 +152,8 @@ def train_val_test_split_ohe(landscapes, test_split=0.2, val_split=0.2, random_s
             test_split (float): proportion of total data used for testing
             val_split (float): proportion of TRAIN data used for validation (NOT total data)
             random_state (int):      controls random state of sklearn train_test_split for reproducible splits. Default 1. """
+
+            
     LANDSCAPES_OHE = [np.array(i.one_hot_encodings) for i in landscapes]
     X_OHE = LANDSCAPES_OHE
     Y_OHE = [i.fitnesses.reshape(-1,1).astype(float) for i in landscapes]

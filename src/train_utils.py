@@ -20,6 +20,12 @@ from scipy.stats import pearsonr
 
 
 def read_CNN_hparams(best_params): 
+
+    """
+    Function to parse hyperparameters from an optuna study's best_params and return them in a form amenable for input into SequenceRegressionCNN instance. 
+
+    """
+
     params = best_params
     num_conv_layers = params['num_conv_layers']
     n_kernels       = [int(params['n_kernels_layer{}'.format(i)]) for i in range(num_conv_layers)]
@@ -29,6 +35,11 @@ def read_CNN_hparams(best_params):
     return param_dict
 
 def read_MLP_hparams(best_params): 
+
+    """
+    Function to parse hyperparameters from an optuna study's best_params and return them in a form amenable for input into SequenceRegressionMLP instance. 
+
+    """
     params=best_params
     n_hidden_layers = params['n_hidden_layers']    
     hidden_sizes = [params['hidden{}_size'.format(i)] for i in range(n_hidden_layers)]
@@ -36,12 +47,22 @@ def read_MLP_hparams(best_params):
     return param_dict
 
 def read_LSTM_hparams(best_params): 
+    """
+    Function to parse hyperparameters from an optuna study's best_params and return them in a form amenable for input into SequenceRegressionLSTM instance. 
+
+    """
     params = best_params
     num_layers  = params['num_layers']
     hidden_size = params['hidden_size']
     param_dict = {'num_layers': num_layers, 'hidden_size': hidden_size}
     return param_dict
+
+
 def read_transformer_hparams(best_params): 
+    """
+    Function to parse hyperparameters from an optuna study's best_params and return them in a form amenable for input into SequenceRegressionTransformer instance. 
+
+    """
     params = best_params
     d_model = params['embed_dim_num_heads'][0]
     nheads  = params['embed_dim_num_heads'][1]
@@ -284,99 +305,4 @@ def instantiate_model_from_study(model_name, study, alphabet_size=6, seq_length=
 
 
             
-        
-    
-"""
-    
-    for k_val, k_replicates in enumerate(landscapes): 
-        print('Training models for K={}'.format(k_val))
-        #initialise correct hyperparameters
-        params          = hparam_studies[k_val].best_params
-
-        print('Models for this value of K will have the following hyperparameters:{}'.format(params))
-        #extract hparams not passed to model 
-        lr              = params['lr']
-        batch_size      = params['batch_size']
-
-        #extract hparams passed to model 
-        if model==SequenceRegressionCNN: #here SequenceRegressionCNN is hardcoded
-            model_params = read_CNN_hparams(params) #we need this special function to correctly parse hparams as stored in optuna study to those we can pass to our CNN model
-            model_params['input_channels']=len(amino_acids)
-            model_params['sequence_length']=seq_length
-            model_name = 'CNN'
-        else: 
-            break #placeholder while developing
-
-        #access appropriate data. Note that splits is structured as 
-        #[[K1_repl1, ...K1_repli], ..., [Kj_repl1, ..., Kj_repli]].
-        #Therefore, xy_train etc will be a list where each element contains data for a replicate landscape
-        #such that xy_train = [repl1, repl2, ..., repli]
-        landscapes_ohe, xy_train, xy_val, xy_test, x_tests, y_tests = splits[k_val]  
-
-        train_epoch_losses_list_k = []
-        val_epoch_losses_list_k   = []
-        r2_scores_k               = []
-        predict_vs_gt_k           = []
-        
-        #now loop over replicates at a given K value
-        for r_index, replicate in enumerate(k_replicates):          
-
-            print('Training model K= {}, replicate {}'.format(k_val, r_index))
-            #define model, loss fn and optimiser 
-            modelr     = model(**model_params)
-            loss_fn   = nn.MSELoss()
-            optimizer = optim.Adam(modelr.parameters(), lr=lr)
-
-            
-            
-             #load dataloaders
-            train_dataloader = DataLoader(xy_train[r_index], batch_size=batch_size, shuffle=True)
-            val_dataloader   = DataLoader(xy_val[r_index], batch_size=batch_size)
-
-            #train model
-            _, train_epoch_losses, val_epoch_losses = train_model(modelr, optimizer, loss_fn, train_dataloader, val_dataloader, 
-                                                                     n_epochs=n_epochs, device=device, patience=patience, min_delta=min_delta)
-
-            #save model 
-            savepath = model_savepath+'/{0}_k{1}_r{2}.pt'.format(model_name, k_val, r_index)
-            torch.save(modelr.state_dict(), savepath)
-
-            #evaluate model on test data
-            modelr.eval()
-
-            x_test = x_tests[r_index].to(device)
-            
-            y_pred  = modelr(x_test)
-            y_pred  = y_pred.cpu().detach()
-            y_test  = y_tests[r_index].detach()
-
-            r2      = r2_score(y_pred, y_test)
-
-            #append relevant lists 
-            train_epoch_losses_list_k.append(train_epoch_losses)
-            val_epoch_losses_list_k.append(val_epoch_losses)
-            r2_scores_k.append(r2)
-            predict_vs_gt_k.append([x_test.cpu().detach().numpy(), y_pred.numpy(), y_test.numpy()])
-        
-        
-        #outer loop appends
-        train_epoch_losses_list.append(train_epoch_losses_list_k)
-        val_epoch_losses_list.append(val_epoch_losses_list_k)
-        r2_scores.append(r2_scores_k)
-        predict_vs_gt.append(predict_vs_gt_k)
-
-    
-    results = (train_epoch_losses_list, val_epoch_losses_list, r2_scores, predict_vs_gt)
-
-    with open(result_path+'/{}_train_test_results.pkl'.format(model_name), 'wb') as handle:
-        pickle.dump(results, handle, protocol=pickle.HIGHEST_PROTOCOL)    
-
-    print('Training and testing finished. Results written to disk.')
-    return results      
-"""            
-
-        
-
-        
-
-    
+ 
