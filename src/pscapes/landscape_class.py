@@ -6,7 +6,6 @@ Modification of code from https://github.com/acmater/NK_Benchmarking/
     * Added optional use for benchmarking models trained on OHE rather
     than tokenization
 '''
-
 import copy
 import multiprocessing as mp
 import numpy as np
@@ -23,7 +22,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
 from typing import Optional, Union
 
-from src.utils import sklearn_utils
+from src.utils import aa_to_ohe, collapse_concat
 
 class ProteinLandscape():
     '''
@@ -63,6 +62,10 @@ class ProteinLandscape():
     saved_file : str, default=None
         Saved version of this class that will be loaded instead of
         instantiating a new one
+
+    save_as_ohe : bool, default=False
+        Option to save processed landscape data as one-hot encoded
+        sequences rather than toeinzed sequences.
 
     Attributes
     ----------
@@ -441,6 +444,10 @@ class ProteinLandscape():
             [[tokens[aa] for aa in seq] for seq in self.sequences]
         )
     
+    def fit_ohe(self):
+        '''Convert sequence data into one-hot encodings.'''
+        self.ohe = [aa_to_ohe(s, self.amino_acids) for s in self.sequences]
+
     def get_data(self, tokenized: bool=False):
         '''
         Returns a copy of the data stored in the class.
@@ -508,7 +515,7 @@ class ProteinLandscape():
             if type(distance) == int:
                 data = copy.copy(self.get_distance(distance,tokenize=True))
             else:
-                data = sklearn_utils.collapse_concat(
+                data = collapse_concat(
                     [copy.copy(self.get_distance(d, tokenize=True)) 
                      for d in distance]
                 )
@@ -792,6 +799,27 @@ class ProteinLandscape():
         results = pool.map(mapfunc,tqdm.tqdm(dataset))
         neighbours = {tuple(key) : value for key, value in results}
         return neighbours
+    
+    def fit_adjacency(self): 
+        if self.graph == None:
+            print('Computing graph...') 
+            self.build_graph()
+            print('Graph built. Computing adjancency...')
+        
+        self.adjacency = self.dict_graph_to_adjacency(self.graph)
+        return self 
+    
+    def dict_graph_to_adjacency(self, dict_graph: dict):
+        '''
+        Get the adjacency matrix from the graph dictionary.
+        '''
+        dim = len(dict_graph)
+        matrix = sp.lil_matrix((dim, dim))
+        values = list(dict_graph.values())
+        
+        for ind, i in enumerate(values): 
+            matrix[ind, i] = 1
+        return matrix
 
     def extrema_ruggedness_subset(self,idxs):
         '''

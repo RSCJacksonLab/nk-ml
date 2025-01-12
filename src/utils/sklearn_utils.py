@@ -1,3 +1,8 @@
+'''
+Modification of code from https://github.com/acmater/NK_Benchmarking/
+    * Formatting changes
+'''
+
 import numpy as np
 import pandas as pd
 
