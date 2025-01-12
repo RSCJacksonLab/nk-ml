@@ -227,6 +227,13 @@ class ProteinLandscape():
         ) = self.rs_ruggedness()
 
         # if processing requires ohe conversion, convert now
+        if save_as_ohe:
+            self.fit_ohe()
+            # back up previous data
+            self.tokenized_data = self.data
+            # overwrite with ohe data
+            print("Overwriting data with OHE form.")
+            self.data = self.ohe
         
         print(self)
 
