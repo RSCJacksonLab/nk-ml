@@ -23,7 +23,7 @@ from pscapes.utils import dict_to_np_array, np_array_to_dict
 
 from architectures import SequenceRegressionCNN, SequenceRegressionLinear, SequenceRegressionMLP, SequenceRegressionLSTM, SequenceRegressionTransformer
 
-from ml_utils import train_val_test_split_ohe, landscapes_ohe_to_numpy
+from src.modelling.ml_utils import train_val_test_split_ohe, landscapes_ohe_to_numpy
 
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor 
 

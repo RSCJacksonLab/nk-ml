@@ -12,7 +12,7 @@ from pscapes.utils import dict_to_np_array, np_array_to_dict
 from src.architectures import SequenceRegressionCNN, SequenceRegressionLSTM, SequenceRegressionMLP, SequenceRegressionLinear, SequenceRegressionTransformer
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 
-from src.ml_utils import train_val_test_split_ohe, train_model, landscapes_ohe_to_numpy
+from src.modelling.ml_utils import train_val_test_split_ohe, train_model, landscapes_ohe_to_numpy
 
 import pickle
 from sklearn.metrics import r2_score, mean_squared_error

@@ -1,29 +1,24 @@
-# This file contains high-level code for hparam optimisation
+'''
+High-level code for hyperparameter optimisation
+'''
 
 import optuna as opt
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import numpy as np
-import sys
-sys.path.append('../../pscapes')
-sys.path.append('../../nk-2025')
-sys.path.append('./')
 
-
-
-from torch.utils.data import DataLoader
-
-
-
-from src.architectures import SequenceRegressionCNN, SequenceRegressionLinear, SequenceRegressionMLP, SequenceRegressionLSTM, SequenceRegressionTransformer 
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.metrics import mean_squared_error
+from torch.utils.data import DataLoader
+
+from src.modelling.architectures import(SequenceRegressionCNN, 
+                                        SequenceRegressionLinear, 
+                                        SequenceRegressionMLP, 
+                                        SequenceRegressionLSTM, 
+                                        SequenceRegressionTransformer)
 
 
 torch.backends.nnpack.enabled = False
-
-
 
 class EarlyStoppingHparamOpt:
     """Class for early stopping during hparam optimisation"""
@@ -39,7 +34,6 @@ class EarlyStoppingHparamOpt:
             self.counter = 0
         else:
             self.counter += 1
-
         return self.counter >= self.patience
 
 
