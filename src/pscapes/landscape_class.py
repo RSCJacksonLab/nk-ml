@@ -2,7 +2,6 @@
 Class for handling a protein dataset.
 
 Modification of code from https://github.com/acmater/NK_Benchmarking/
-    * Formatting changes
     * Added optional use for benchmarking models trained on OHE rather
     than tokenization
     * Updated data splitting to be deterministic
@@ -21,16 +20,16 @@ from numpy.typing import ArrayLike
 from pathlib import Path
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
-from src.utils import aa_to_ohe, collapse_concat
+from src.utils import aa_to_ohe, collapse_concat, token_data_to_ohe
 
 class ProteinLandscape():
     '''
     Class that handles a protein dataset
 
-    Parameters
-    ----------
+    Parameters:
+    -----------
     data : np.array
         Numpy Array containg protein data. Expected shape is (Nx2),
         with the first column being the sequences, and the second being
@@ -64,12 +63,8 @@ class ProteinLandscape():
         Saved version of this class that will be loaded instead of
         instantiating a new one
 
-    save_as_ohe : bool, default=False
-        Option to save processed landscape data as one-hot encoded
-        sequences rather than toeinzed sequences.
-
-    Attributes
-    ----------
+    Attributes:
+    -----------
     amino_acids : str, default='ACDEFGHIKLMNPQRSTVWY'
         String containing all allowable amino acids in tokenization
         functions.
@@ -149,7 +144,6 @@ class ProteinLandscape():
                                          "index_col": None},
                 amino_acids: str='ACDEFGHIKLMNPQRSTVWY',
                 saved_file: Optional[Path] = None,
-                save_as_ohe: bool = False,
                 ):
         
         if saved_file is not None:
@@ -181,8 +175,10 @@ class ProteinLandscape():
                                  list(range(len(self.amino_acids))))
         }
         self.graph = None
+        # data is stored with sequences in the first column and fitnesses
         self.sequences = self.data[:, 0]
         self.fitnesses = self.data[:, 1]
+        self.ohe = self.return_ohe(self.sequences)
 
         # assign sequence properties
         if seed_seq:
@@ -225,16 +221,6 @@ class ProteinLandscape():
             self.linear_RMSE,
             self.RS_ruggedness,
         ) = self.rs_ruggedness()
-
-        # if processing requires ohe conversion, convert now
-        if save_as_ohe:
-            self.fit_ohe()
-            # back up previous data
-            self.tokenized_data = self.data
-            # overwrite with ohe data
-            print("Overwriting data with OHE form.")
-            self.data = self.ohe
-        
         print(self)
 
     def seed(self):
@@ -265,33 +251,39 @@ class ProteinLandscape():
     def __getitem__(self, idx):
         return self.data[idx]
     
-    def get_distance(self, d: int, tokenize: bool=False):
+    def get_distance(self, 
+                     dist: int, 
+                     return_as: Optional[Literal["tokens", "ohe"]] = None):
         '''
         Returns all arrays at a fixed distance from the seed string
 
-        Parameters
-        ----------
-        d : int
+        Parameters:
+        -----------
+        dist : int
             The distance that you want extracted
 
         tokenize : Bool, False
             Whether or not the returned data will be in tokenized form
             or not.
         '''
-        assert d in self.d_data.keys(), "Distance not found in data."
+        assert dist in self.d_data.keys(), "Distance not found in data."
 
-        if tokenize:
-            return self.tokenized[self.d_data[d]]
+        if return_as == "tokens":
+            return self.tokenized[self.d_data[dist]]
+        elif return_as == "ohe":
+            return self.ohe[self.d_data[dist]]
         else:
-            return self.data[self.d_data[d]]
+            return self.data[self.d_data[dist]]
 
-    def get_mutated_positions(self, positions: ArrayLike, tokenize=False):
+    def get_mutated_positions(self, 
+                              positions: ArrayLike, 
+                              tokenize: bool = False):
         '''
         Function that returns the portion of the data only where the
         provided positions have been modified.
 
-        Parameters
-        ----------
+        Parameters:
+        -----------
         positions : np.array(ints)
             Numpy array of integer positions that will be used to index
             the data.
@@ -299,6 +291,13 @@ class ProteinLandscape():
         tokenize : Bool, default=False
             Boolean that determines if the returned data will be
             tokenized or not.
+
+        Returns:
+        --------
+        sequence_data : ArrayLike   
+            Returns the data array with only the sequences that have 
+            been modified at the provided positions. Cn provide as 
+            either tokenized or raw sequence form.
         '''
         for pos in positions:
             assert pos in self.mutated_positions, (
@@ -459,9 +458,9 @@ class ProteinLandscape():
             [[tokens[aa] for aa in seq] for seq in self.sequences]
         )
     
-    def fit_ohe(self):
+    def return_ohe(self):
         '''Convert sequence data into one-hot encodings.'''
-        self.ohe = [aa_to_ohe(s, self.amino_acids) for s in self.sequences]
+        return [aa_to_ohe(s, self.amino_acids) for s in self.sequences]
 
     def get_data(self, tokenized: bool=False):
         '''
@@ -493,10 +492,11 @@ class ProteinLandscape():
                      positions: Optional[list] = None,
                      split: float = 0.8,
                      shuffle: bool = True,
-                     random_state: Optional[int] = None):
+                     random_state: Optional[int] = None,
+                     convert_to_ohe: bool = False):
         '''
-        Parameters
-        ----------
+        Parameters:
+        -----------
         data : np.array(NxM+1), default=None
 
             Optional data array that will be split. Added to the 
@@ -519,20 +519,32 @@ class ProteinLandscape():
         shuffle : Bool, default=True
             Determines if the data will be shuffled prior to returning.
 
-        returns : x_train, y_train, x_test, y_test
+        convert_to_ohe : Bool, default=False
+            Determines if the data will be converted to one-hot encoding
+            before being returned. Else, data will remain tokenized.
+
+        Returns:
+        --------
+        x_train, y_train, x_test, y_test
             All Nx1 arrays with train as the first 80% of the shuffled
             data and test as the latter 20% of the shuffled data.
         '''
         assert (0 <= split <= 1), "Split must be between 0 and 1"
 
+        # determine embedding scheme
+        return_as = 'tokens'
+        if convert_to_ohe:
+            return_as = 'ohe'
+
         if data is not None:
             data = data
-        elif distance:
+        elif distance is not None:
             if type(distance) == int:
-                data = copy.copy(self.get_distance(distance, tokenize=True))
+                data = copy.copy(self.get_distance(distance,
+                                                   return_as=return_as))
             else:
                 data = collapse_concat(
-                    [copy.copy(self.get_distance(d, tokenize=True)) 
+                    [copy.copy(self.get_distance(d, return_as=return_as))
                      for d in distance]
                 )
         elif positions is not None:
@@ -560,6 +572,13 @@ class ProteinLandscape():
         y_train = train[:,-1]
         x_test  = test[:,:-1]
         y_test  = test[:,-1]
+
+        # convert tokenized data if requested - makes flat ohe
+        if convert_to_ohe:
+            x_train = token_data_to_ohe(x_train, self.amino_acids)
+            y_train = token_data_to_ohe(y_train, self.amino_acids)
+            x_test = token_data_to_ohe(x_test, self.amino_acids)
+            y_test = token_data_to_ohe(y_test, self.amino_acids)
 
         return x_train.astype("int"), y_train.astype("float"), \
                x_test.astype("int"), y_test.astype("float")
