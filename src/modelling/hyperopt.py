@@ -1,15 +1,16 @@
 '''
 High-level code for hyperparameter optimisation
 '''
-
 import optuna as opt
 import torch
 import torch.nn as nn
 import torch.optim as optim
 
+from numpy.typing import ArrayLike
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.metrics import mean_squared_error
 from torch.utils.data import DataLoader
+from typing import Any, Dict, List
 
 from src.modelling.architectures import(SequenceRegressionCNN, 
                                         SequenceRegressionLinear, 
@@ -21,13 +22,13 @@ torch.backends.nnpack.enabled = False
 
 class EarlyStoppingHparamOpt:
     """Class for early stopping during hparam optimisation"""
-    def __init__(self, patience=5, min_delta=0):
+    def __init__(self, patience: int=5, min_delta: float=0):
         self.patience = patience
         self.min_delta = min_delta
         self.best_loss = float('inf')
         self.counter = 0
 
-    def should_stop(self, val_loss):
+    def should_stop(self, val_loss: float):
         if val_loss < self.best_loss - self.min_delta:
             self.best_loss = val_loss
             self.counter = 0
@@ -36,26 +37,64 @@ class EarlyStoppingHparamOpt:
         return self.counter >= self.patience
 
 
-def optimise_hparams(trial, model, loss_fn, optimizer, train_dataloader, val_dataloader, device, n_epochs=30, patience=5, min_delta=1e-5):
+def optimise_hparams(trial: opt.Trial, 
+                     model: nn.Module, 
+                     loss_fn: nn.modules.loss._Loss,
+                     optimizer: optim.Optimizer,
+                     train_dataloader: DataLoader,
+                     val_dataloader: DataLoader,
+                     device: str,
+                     n_epochs: int = 30,
+                     patience: int = 5,
+                     min_delta: float = 1e-5):
     """
-    Function to run inner training/validation loop for hparam optimisation. 
-    Similar in function to train_model(). 
+    Function to run inner training/validation loop for hparam
+    optimisation. Similar in function to train_model(). 
 
-    Args:
-        trial:                                         optuna trial keyword 
-        model (src.architectures):                     insantiated instance of model() with appropriate parameters
-        loss_fn (torch.nn.modules.loss):               instantiated loss function instance 
-        optimizer (torch.optim):                       instantiated optimizer function instance 
-        train_dataloader (torch DataLoader):           DataLoader with train data
-        val_dataloader (torch DataLoader):             DataLoader with val data 
-        n_epochs (int):                                number of epochs to train unless early stopping initiated
-        patience (int):                                patience value for early stopping 
-        min_delta (float):                             min_delta change value for early stopping 
- 
-        device (str):                                  device for PyTorch
+    Parameters:
+    -----------
+    trial : optuna.trial.Trial: 
+        Optuna trial keyword for hyperparameter optimization.
+
+    model : nn.Module: 
+        An instantiated instance of the model with appropriate 
+        parameters.
+
+    loss_fn : torch.nn.modules.loss._Loss
+        Instantiated loss function instance.
+
+    optimizer : torch.optim.Optimizer
+        Instantiated optimizer instance.
+
+    train_dataloader : torch.utils.data.DataLoader
+        DataLoader containing the training data.
+
+    val_dataloader : torch.utils.data.DataLoader
+        DataLoader containing the validation data.
+
+    device : str
+        Device for PyTorch computations, e.g., 'cpu' or 'cuda'.
+
+    n_epochs : int, default=30
+        The number of epochs to train, unless early stopping is
+        triggered.
+
+    patience : int, default=5
+        Patience value for early stopping (number of epochs to wait for
+        improvement).
+
+    min_delta : float, default=1e-5
+        Minimum change in validation loss to qualify as an improvement
+        for early stopping.
+
+    Returns:
+    --------
+    val_loss : float
+        A float containing the validation loss.
                
     """
-    early_stopping = EarlyStoppingHparamOpt(patience=patience, min_delta=min_delta)
+    early_stopping = EarlyStoppingHparamOpt(patience=patience,
+                                            min_delta=min_delta)
     model.to(device)
 
     epoch_val_losses = []
@@ -102,16 +141,27 @@ def optimise_hparams(trial, model, loss_fn, optimizer, train_dataloader, val_dat
     return val_loss
         
 
-def generate_valid_combinations_transformer(embed_dim_options, max_heads):
+def get_tx_hparam_combinations(embed_dim_options: List[int], 
+                               max_heads: int):
     """
-    Function to generate valid combinations of embedding dimension and maximum number of heads. Ensures that the embedding dimension (embed_dim) can be 
-    evenly divided by the number of attention heads (num_heads).
-    
-    Args: 
+    Generate valid combinations of embedding dimension and the number 
+    of attention heads. Ensures the embedding dimension (embed_dim) 
+    can be evenly divided by the number of attention heads (num_heads).
 
-        embed_dim_options (list):                   list of ints, where each int is an option for the embedding dimension
-        max_heads (int):                            maximum number of attention heads to consider 
+    Parameters:
+    -----------
+        embed_dim_options (List[int]): 
+            A list of integers representing options for the embedding 
+            dimension.
+        max_heads (int): 
+            The maximum number of attention heads to consider.
 
+    Returns:
+    --------
+        List[Tuple[int, int]]: 
+            A list of tuples, where each tuple contains a valid 
+            embedding dimension and the corresponding number of 
+            attention heads.
     """
 
     valid_combinations = []
@@ -122,69 +172,155 @@ def generate_valid_combinations_transformer(embed_dim_options, max_heads):
                 valid_combinations.append((embed_dim, num_heads))
     
     return valid_combinations
-
-def objective(trial, h_param_search_space, model, train_data, val_data, n_epochs=30, patience=5, min_delta=1e-5, device='cuda'):
+   
+def objective_fn(trial: opt.Trial,
+                search_space: Dict[str, Any],
+                model: nn.Module,
+                train_data: Any,
+                val_data: Any,
+                n_epochs: int = 30,
+                patience: int = 5,
+                min_delta: float = 1e-5,
+                device: str = 'cuda') -> float:
     """
-    
-    High-level function to perform hyperparameter optimisation on models. Define the search space in h_param_search_space (dict) 
-    by specifying model parameter names as keys, and values as optuna trial samplers. Please also specify model parameters needed 
-    for instantiation but that are not being optimised (otherwise model will return error). 
+    Perform hyperparameter optimization on a given model. The search space 
+    is defined in h_param_search_space as a dictionary, where keys are model 
+    parameter names and values are Optuna trial samplers. Include all model 
+    parameters needed for instantiation but not optimized to avoid errors.
 
-    Args: 
+    Parameters:
+    -----------
+        trial (optuna.trial.Trial): 
+            Optuna trial object.
 
-        trial:                                  optuna trial object
-        h_param_search_space (dict):            dict of hyperparameters {hparam_name: hparam_value}. Specify search space with optuna.trial sampler as value if 
-                                                wanting to optimise that hyperparameter. Example: {'learning_rate': trial.suggest_categorical('lr', [0.01, 0.001, 0.0001]), 'sequence_length':5 }
-        model (nn.Module):                      model to optimise. Do NOT instantiate model with model() on passing.
-        train_data:                             train data
-        val_data:                               val data
-        n_epochs (int):                         number of epochs to train for 
-        patience (int):                         patience for early stopping 
-        mind_delta(float):                      min_delta for early stopping   
-        
-    TO DO: switch to model_name instance of model for identification of model.
+        search_space (Dict[str, Any]): 
+            Dictionary defining hyperparameters to optimize. Keys are 
+            parameter names, and values are either fixed values or Optuna 
+            samplers. Example: 
+            {'learning_rate': trial.suggest_categorical(
+                'lr', [0.01, 0.001, 0.0001]
+             ), 'sequence_length': 5}.
 
+        model (nn.Module): 
+            Model to optimize. Do NOT instantiate it (i.e., avoid model()).
 
-    """           
+        train_data (Any): 
+            Training data.
 
-    #define search spaces based on model
-    hpss= h_param_search_space
-    learning_rate = trial.suggest_categorical('lr', hpss['learning_rate'])
-    batch_size    = trial.suggest_categorical('batch_size', hpss['batch_size'])
+        val_data (Any): 
+            Validation data.
+
+        n_epochs (int, optional): 
+            Number of epochs to train. Defaults to 30.
+
+        patience (int, optional): 
+            Patience value for early stopping. Defaults to 5.
+
+        min_delta (float, optional): 
+            Minimum delta for early stopping. Defaults to 1e-5.
+
+        device (str, optional): 
+            Device for PyTorch computations (e.g., 'cuda' or 'cpu'). 
+            Defaults to 'cuda'.
+
+    Returns:
+    --------
+        val_loss : float 
+            Best validation loss achieved during training.
+
+    TODO:
+        Switch to using a model_name parameter to identify the model.
+    """
+
+    # define search spaces based on model
+    learning_rate = trial.suggest_categorical('lr', 
+                                              search_space['learning_rate'])
+    batch_size = trial.suggest_categorical('batch_size',
+                                           search_space['batch_size'])
     print(model) 
-    if model==SequenceRegressionLinear: #TO DO: switch to model_name instance of model for identification of model
+    if model==SequenceRegressionLinear:
         print (model)
-        model_instance = model(alphabet_size=hpss['alphabet_size'], sequence_length=hpss['sequence_length'])
+        model_instance = model(alphabet_size=search_space['alphabet_size'], 
+                               sequence_length=search_space['sequence_length'])
         
-    elif model==SequenceRegressionMLP: #TO DO: switch to model_name instance of model for identification of model
-        n_hidden_layers = trial.suggest_int('n_hidden_layers',1, hpss['max_hidden_layers']) #max_hidden_sizes should be an int
-        hidden_sizes    = [int(trial.suggest_categorical("hidden{}_size".format(i), hpss['hidden_sizes_categorical'])) #hidden_sizes_categorical should be a list of hidden sizes
-                            for i in range(n_hidden_layers)]
-        model_instance = model(alphabet_size=hpss['alphabet_size'], sequence_length=hpss['sequence_length'], hidden_sizes=hidden_sizes)
+    elif model==SequenceRegressionMLP:
+        n_hidden_layers = trial.suggest_int('n_hidden_layers',
+                                            1,
+                                            search_space['max_hidden_layers'])
+        hidden_sizes = [
+            int(
+                trial.suggest_categorical(
+                    "hidden{}_size".format(i), search_space['hidden_sizes_categorical']
+                )
+            )
+            for i in range(n_hidden_layers)
+        ]
+        model_instance = model(alphabet_size=search_space['alphabet_size'], 
+                               sequence_length=search_space['sequence_length'], 
+                               hidden_sizes=hidden_sizes)
 
-    elif model==SequenceRegressionCNN: #TO DO: switch to model_name instance of model for identification of model
-        num_conv_layers = trial.suggest_int('num_conv_layers', 1, hpss['max_conv_layers']) #max_conv_layers should be an int
-        n_kernels = [int(trial.suggest_int("n_kernels_layer{}".format(i), hpss['n_kernels_min'], hpss['n_kernels_max'] , hpss['n_kernels_step']))for i in range(num_conv_layers)]      
-        kernel_sizes = [int(trial.suggest_int("kernel_size_layer{}".format(i), hpss['kernel_sizes_min'], hpss['kernel_sizes_max'], 2))for i in range(num_conv_layers)]
-        model_instance = model(input_channels=hpss['alphabet_size'], sequence_length=hpss['sequence_length'], num_conv_layers=num_conv_layers,
-                              n_kernels=n_kernels, kernel_sizes=kernel_sizes)
-    elif model==SequenceRegressionLSTM: #TO DO: switch to model_name instance of model for identification of model
-        num_layers     = trial.suggest_int('num_layers', 1, hpss['max_lstm_layers']) #max_lstm_layers should be int
-        hidden_size    = trial.suggest_categorical("hidden_size", hpss['hidden_sizes']) #hidden_sizes should be a list of possible hidden layuer sizes
-        bidirectional  = hpss['bidirectional']               
-        model_instance = model(input_size=hpss['alphabet_size'], hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional)
+    elif model==SequenceRegressionCNN:
+        num_conv_layers = trial.suggest_int('num_conv_layers', 
+                                            1, 
+                                            search_space['max_conv_layers'])
+        n_kernels = [
+            int(trial.suggest_int("n_kernels_layer{}".format(i), 
+                                  search_space['n_kernels_min'], 
+                                  search_space['n_kernels_max'], 
+                                  search_space['n_kernels_step']))
+            for i in range(num_conv_layers)
+        ]      
+        kernel_sizes = [
+            int(trial.suggest_int("kernel_size_layer{}".format(i), 
+                                  search_space['kernel_sizes_min'], 
+                                  search_space['kernel_sizes_max'], 2))
+            for i in range(num_conv_layers)
+        ]
+        model_instance = model(input_channels=search_space['alphabet_size'],
+                               sequence_length=search_space['sequence_length'],
+                               num_conv_layers=num_conv_layers,
+                               n_kernels=n_kernels,
+                               kernel_sizes=kernel_sizes)
+        
+    elif model==SequenceRegressionLSTM:
+        num_layers = trial.suggest_int('num_layers', 
+                                       1,
+                                       search_space['max_lstm_layers'])
+        hidden_size = trial.suggest_categorical("hidden_size",
+                                                search_space['hidden_sizes'])
+        bidirectional  = search_space['bidirectional']               
+        model_instance = model(input_size=search_space['alphabet_size'],
+                               hidden_size=hidden_size,
+                               num_layers=num_layers, 
+                               bidirectional=bidirectional)
     
-    elif model==SequenceRegressionTransformer: #TO DO: switch to model_name instance of model for identification of model
-        embed_dim_options = hpss['embed_dim_options']
-        max_heads = hpss['max_heads']
-        valid_combinations = generate_valid_combinations_transformer(embed_dim_options, max_heads)
+    elif model==SequenceRegressionTransformer: 
+        embed_dim_options = search_space['embed_dim_options']
+        max_heads = search_space['max_heads']
+        valid_combinations = get_tx_hparam_combinations(embed_dim_options,
+                                                        max_heads)
     
-        d_model, nhead = trial.suggest_categorical("embed_dim_num_heads", valid_combinations)
-            
-        num_layers      = trial.suggest_int('num_layers', 1, hpss['max_layers']) #should be int
-        dim_feedforward = trial.suggest_categorical('dim_feedforward', hpss['feedforward_dims']) # should be list of ints possible dims 
-        max_seq_length  = trial.suggest_categorical("max_seq_length", hpss['max_seq_lengths']) #shold be list of ints of possible max seq lengths                   
-        model_instance  = model(input_dim=hpss['alphabet_size'], d_model=d_model, nhead=nhead,dim_feedforward=dim_feedforward,
+        d_model, nhead = trial.suggest_categorical(
+            "embed_dim_num_heads", 
+            valid_combinations
+        )
+        num_layers = trial.suggest_int(
+            'num_layers', 
+            1, 
+            search_space['max_layers']
+        )
+        dim_feedforward = trial.suggest_categorical(
+            'dim_feedforward',
+            search_space['feedforward_dims']
+        )
+        max_seq_length = trial.suggest_categorical(
+            "max_seq_length",
+            search_space['max_seq_lengths']
+        )                   
+        model_instance = model(input_dim=search_space['alphabet_size'],
+                               d_model=d_model,
+                               nhead=nhead,
+                               dim_feedforward=dim_feedforward,
                                max_seq_length=max_seq_length)
     else: 
         raise Exception("Model not recognised.")
@@ -200,45 +336,78 @@ def objective(trial, h_param_search_space, model, train_data, val_data, n_epochs
     val_loader = DataLoader(val_data, batch_size=batch_size)
 
     #run train/val
-    val_loss = optimise_hparams(trial, model_instance, loss_fn, optimizer, train_loader, 
-                               val_loader, n_epochs=n_epochs, patience=patience, min_delta=min_delta, device=device)
+    val_loss = optimise_hparams(trial, 
+                                model_instance, 
+                                loss_fn, 
+                                optimizer, 
+                                train_loader, 
+                                val_loader,
+                                n_epochs=n_epochs,
+                                patience=patience,
+                                min_delta=min_delta,
+                                device=device)
     return val_loss
 
 
-def sklearn_objective(trial, model_name, x_train, y_train, x_val, y_val):
+def sklearn_objective(trial, 
+                      model_name: str, 
+                      x_train: ArrayLike, 
+                      y_train: ArrayLike,
+                      x_val: ArrayLike, 
+                      y_val: ArrayLike) -> float:
     """
-    model_name (str):   either 'RF' or 'GB'
-    x_train(np.array):  np array of shape (samples, seq_length*alphabet_size)
-    y_train(np.array):  np array of shape (samples, )
-    x_val(np.array):    np array of shape (samples, seq_length*alphabet_size)
-    y_val(np.array):    np array of shape (samples, )
+    Perform hyperparameter optimization for a scikit-learn model.
 
+    Parameters:
+    -----------
+        trial (optuna.trial.Trial): 
+            An Optuna trial object for hyperparameter sampling.
+
+        model_name (str): 
+            Name of the model to optimize, either 'RF' (Random Forest)
+            or 'GB' (Gradient Boosting).
+
+        x_train (np.array): 
+            Training data features with shape (samples, seq_length * 
+            alphabet_size).
+
+        y_train (np.array): 
+            Training data labels with shape (samples, ).
+
+        x_val (np.array): 
+            Validation data features with shape (samples, seq_length * 
+            alphabet_size).
+
+        y_val (np.array): 
+            Validation data labels with shape (samples, ).
+
+    Returns:
+    --------
+        val_loss : float
+            Validation score (e.g., accuracy or loss) for the model with the 
+            current hyperparameters.
     """
-    
     if model_name=='RF': 
         max_features = trial.suggest_float('max_features', 0.1, 1)
         n_estimators = trial.suggest_int('n_estimators', 10, 1000)
-        max_depth    = trial.suggest_int('max_depth', 1, 32)
-        model        = RandomForestRegressor(max_features=max_features, n_estimators=n_estimators, 
-                                             max_depth=max_depth, n_jobs=-1)
-    elif model_name=='GB': 
-        #learning_rate = trial.suggest_float('learning_rate', 0.001, 0.2)
-        #max_iter      = trial.suggest_int('max_iter', 10, 1000)
-        #max_leaf_nodes = trial.suggest_int('max_leaf_nodes', 2, 100)
-        
-        max_depth     = trial.suggest_int('max_depth', 1, 32)
-        n_estimators  = trial.suggest_int('n_estimators', 10, 1000)
-        learning_rate = trial.suggest_float('learning_rate', 0.001, 0.2) 
-        model         = GradientBoostingRegressor(max_depth=max_depth, n_estimators=n_estimators, 
-                                                  learning_rate=learning_rate)
+        max_depth = trial.suggest_int('max_depth', 1, 32)
+        model = RandomForestRegressor(max_features=max_features, 
+                                      n_estimators=n_estimators, 
+                                      max_depth=max_depth,
+                                      n_jobs=-1)
+    elif model_name=='GB':         
+        max_depth = trial.suggest_int('max_depth', 1, 32)
+        n_estimators = trial.suggest_int('n_estimators', 10, 1000)
+        learning_rate = trial.suggest_float('learning_rate', 0.001, 0.2)
+        model = GradientBoostingRegressor(max_depth=max_depth, 
+                                          n_estimators=n_estimators, 
+                                          learning_rate=learning_rate)
     else: 
-        raise Exception('Invalid model name. Model name must be "RF" or "GB".')
+        raise Exception('Model name must be "RF" or "GB".')
     
     print('Fitting model in trial.')
     model.fit(x_train, y_train)
     y_pred   = model.predict(x_val)
     val_loss =  mean_squared_error(y_val, y_pred)
-        
-
-
+    
     return val_loss 
