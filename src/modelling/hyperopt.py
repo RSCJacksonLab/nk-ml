@@ -17,7 +17,6 @@ from src.modelling.architectures import(SequenceRegressionCNN,
                                         SequenceRegressionLSTM, 
                                         SequenceRegressionTransformer)
 
-
 torch.backends.nnpack.enabled = False
 
 class EarlyStoppingHparamOpt:

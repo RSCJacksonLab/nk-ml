@@ -1,0 +1,1 @@
+from src.pscapes.NK_landscape import make_NK
