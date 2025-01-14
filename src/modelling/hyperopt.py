@@ -227,9 +227,6 @@ def objective_fn(trial: opt.Trial,
     --------
         val_loss : float 
             Best validation loss achieved during training.
-
-    TODO:
-        Switch to using a model_name parameter to identify the model.
     """
 
     # define search spaces based on model

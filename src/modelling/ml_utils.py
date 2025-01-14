@@ -1,34 +1,43 @@
+import numpy as np
+import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader
 
-import numpy as np
+from datetime import datetime
 from sklearn.model_selection import train_test_split
-import os
+from torch.utils.data import DataLoader
+from typing import List
 
-
-
+from src.pscapes import ProteinLandscape
 
 class EarlyStopping:
-    def __init__(self, patience=5, min_delta=0.0, path='best_model_{}.pt'):
+    def __init__(self, 
+                 patience: int = 5, 
+                 min_delta: float = 0.0, 
+                 path: str = 'best_model_{}.pt'):
         """
         Class for early stopping during model training. 
 
-        Args:
-            patience (int): How long to wait after last time validation loss improved.
-            min_delta (float): Minimum change in the monitored quantity to qualify as an improvement.
-            path (str): Path to save the best model.
+        Parameters:
+        -----------
+            patience : int
+                How long to wait after last time validation loss
+                improved.
+
+            min_delta : float
+                Minimum change in the monitored quantity to qualify as
+                an improvement.
+
+            path : str
+                Path to save the best model. Date and time are appended.
         """
         self.patience = patience
         self.min_delta = min_delta
-        
-        
-        self.path = path.format(np.random.randint(10000000,100000000 ))
+        self.path = path.format(datetime.now().strftime("%y%m%d-%H%M"))
         self.counter = 0
         self.best_loss = None
         self.early_stop = False
-
         
     def __call__(self, val_loss, model):
         if self.best_loss is None:
@@ -47,25 +56,49 @@ class EarlyStopping:
         """Saves model when validation loss decreases."""
         torch.save(model.state_dict(), self.path)
 
-def train_model(model, optimizer, loss_fn, train_loader, val_loader, n_epochs=30, device='cpu', patience=5, min_delta=1e-5):
+
+def train_model(model: nn.Module,
+                optimizer: optim.Optimizer,
+                loss_fn: nn.modules.loss._Loss, 
+                train_loader: DataLoader, 
+                val_loader: DataLoader,
+                n_epochs: int = 30,
+                patience: int = 5, 
+                min_delta: float = 1e-5,
+                device: str='cpu'):
     """
-    Function for training a model. 
+    Function for training a model.
 
-    Args:     
-        model (src.architectures):                     insantiated instance of model() with appropriate parameters
-        loss_fn (torch.nn.modules.loss):               instantiated loss function instance 
-        optimizer (torch.optim):                       instantiated optimizer function instance 
-        train_loader (torch DataLoader):               DataLoader with train data
-        val_loader (torch DataLoader):                 DataLoader with val data 
-        n_epochs (int):                                number of epochs to train unless early stopping initiated
-        patience (int):                                patience value for early stopping 
-        min_delta (float):                             min_delta change value for early stopping 
-        device (str):                                  device for PyTorch
+    Parameters:
+    -----------
+        model : nn.Module
+            Instantiated instance of model() with appropriate parameters.
 
+        optimizer : torch.optim.Optimizer
+            Instantiated optimizer function instance.
 
+        loss_fn : torch.nn.modules.loss
+            Instantiated loss function instance.
 
+        train_loader : torch.utils.data.DataLoader
+            DataLoader with training data.
+
+        val_loader : torch.utils.data.DataLoader
+            DataLoader with validation data.
+
+        n_epochs : int, default=30
+            Number of epochs to train unless early stopping is initiated.
+
+        patience : int, default=5
+            Patience value for early stopping.
+
+        min_delta : float, default=1e-5
+            Minimum change in the monitored quantity to qualify as an 
+            improvement for early stopping.
+
+        device : str, default=cpu
+            Device for PyTorch computations, e.g., 'cpu' or 'cuda'.
     """
-
     early_stopping = EarlyStopping(patience=patience, min_delta=min_delta)
     model = model.to(device)
     val_epoch_losses = []
@@ -106,12 +139,10 @@ def train_model(model, optimizer, loss_fn, train_loader, val_loader, n_epochs=30
         val_loss /= len(val_loader)
         val_epoch_losses.append(val_loss)
 
-        
-            
-            
-        
-
-        print(f"Epoch [{epoch+1}/{n_epochs}], Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
+        print(
+            f"Epoch [{epoch+1}/{n_epochs}], Train Loss: {train_loss:.4f}, "
+            f"Val Loss: {val_loss:.4f}"
+        )
 
         # Check early stopping
         early_stopping(val_loss, model)
@@ -127,82 +158,68 @@ def train_model(model, optimizer, loss_fn, train_loader, val_loader, n_epochs=30
       os.remove(early_stopping.path)
     else:
       print("The file does not exist")
-        
     return model, train_epoch_losses, val_epoch_losses
 
 
-
-def get_trainable_params(model): 
+def get_trainable_params(model: nn.Module): 
     """
-    Get the number of trainable parameters for a model. 
+    Get the number of trainable parameters for a model.
     """
-
-    pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    pytorch_total_params = sum(
+        p.numel() for p in model.parameters() if p.requires_grad
+    )
     return pytorch_total_params
 
 
-
-
-def train_val_test_split_ohe(landscapes, test_split=0.2, val_split=0.2, random_state=1): 
-    """Performs train-test-val splitting of data using a list of protein landscape class objects. NOTE: validation data 
-        proportion is proportion of TRAIN data NOT total data. 
-    
-    Args: FIX THIS FUNCTION TO MAKE FASTER AND NEATER BEFORE PUBLICATION
-            landscapes (list): List of Protein_Landscape class objects
-            test_split (float): proportion of total data used for testing
-            val_split (float): proportion of TRAIN data used for validation (NOT total data)
-            random_state (int):      controls random state of sklearn train_test_split for reproducible splits. Default 1. """
-
-            
-    LANDSCAPES_OHE = [np.array(i.one_hot_encodings) for i in landscapes]
-    X_OHE = LANDSCAPES_OHE
-    Y_OHE = [i.fitnesses.reshape(-1,1).astype(float) for i in landscapes]
-    XY_OHE = [list(zip(torch.from_numpy(X_OHE[i]).to(torch.float32), torch.from_numpy(Y_OHE[i]).to(torch.float32))) for i in range(len(X_OHE))]
-    XY_OHE_TRAIN_TEST_SPLIT = [train_test_split(i, test_size=round(len(i)*test_split), random_state=random_state) for i in XY_OHE]
-    
-    XY_TRAIN = [i[0] for i in XY_OHE_TRAIN_TEST_SPLIT]
-    XY_TEST  = [i[1] for i in XY_OHE_TRAIN_TEST_SPLIT]
-    XY_TRAIN_VAL_SPLIT = [train_test_split(i, test_size=round(len(i)*val_split), random_state=random_state) for i in XY_TRAIN]
-    
-    XY_TRAINING = [i[0] for i in XY_TRAIN_VAL_SPLIT]
-    XY_VAL      = [i[1] for i in XY_TRAIN_VAL_SPLIT]
-
-
-    X_TEST = []
-    Y_TEST = []
-
-    for ind, i in enumerate(XY_OHE_TRAIN_TEST_SPLIT):
-        
-        x_test = []
-        y_test = []
-        for x, y in XY_OHE_TRAIN_TEST_SPLIT[ind][1]: 
-            x_test.append(x.numpy())
-            y_test.append(y.numpy())
-
-        x_test = torch.from_numpy(np.array(x_test))
-        y_test = torch.from_numpy(np.array(y_test))
-        
-        X_TEST.append(x_test)
-        Y_TEST.append(y_test)
-    
-    return LANDSCAPES_OHE, XY_TRAINING, XY_VAL, XY_TEST, X_TEST, Y_TEST
-
-
-
-
-def landscapes_ohe_to_numpy(OHE_landscape_list):
-    """ Function to convert OHE arrays output by train_val_test_split_ohe() into scikit-amenable flattened numpy arrays. 
-
-        Arguments: 
-            OHE_landscape_list (list):     list of landscapes formatted output by train_val_test_split_ohe
-
-        Returns: 
-            x_flat_array (np.array):        np.array of shape (len(OHE_landscape_list), n_samples, len(AA_alphabet)*sequence_length)
-            y_flat_array (np.array):        np.array of shape (len(OHE_landscape_list), n_samples, 1)
+def landscape_data_split(landscape_ls: List[ProteinLandscape],
+                         test_split: float = 0.2, 
+                         val_split: float = 0.2, 
+                         random_state: int = 1): 
     """
+    Performs train-test-val splitting of data using a list of protein
+    landscape class objects. NOTE: validation data proportion is
+    proportion of TRAIN data NOT total data. 
 
-    xy_np_flattened = [[(i[0].numpy().flatten(), i[1].numpy()) for i in j] for j in OHE_landscape_list]
-    x_flat_array = np.array([[i[0] for i in j] for j in xy_np_flattened])
-    y_flat_array = np.array([[i[1] for i in j] for j in xy_np_flattened])
+    Parameters:
+    -----------
+    landscape_ls : List[ProteinLandscape]
+        List of protein landscapes.
+
+    test_split : float
+        Proportion of total data used for testing
+
+    val_split : float
+        proportion of TRAIN data used for validation (NOT total data).
+
+    random_state : int
+        Random state of sklearn split.
+    """
+    x_ohe = [np.array(instance.ohe) for instance in landscape_ls]
+    y_ohe = [instance.fitnesses.reshape(-1,1).astype(float)
+             for instance in landscape_ls]
+    # make list of tuples (x, y) for each landscape
+    data_tuples = [list(zip(torch.from_numpy(x_ohe[i]).to(torch.float32), 
+                            torch.from_numpy(y_ohe[i]).to(torch.float32))) 
+                   for i in range(len(x_ohe))]
     
-    return x_flat_array, y_flat_array
+    # iterate through each landscape and collate data splits
+    train_data_ls = []
+    val_data_Ls = []
+    tst_data_ls = []
+    for data in data_tuples:
+        # make data splits
+        x_trn_outer, x_tst, y_trn_outer, y_tst = train_test_split(
+            data, 
+            test_size=len(data)*test_split,
+            random_state=random_state
+        )
+        x_trn, x_val, y_trn, y_val = train_test_split(
+            (x_trn_outer, y_trn_outer),
+            test_size=round(len(x_trn_outer)*val_split),
+            random_state=random_state
+        )
+        train_data_ls.append((x_trn, y_trn))
+        val_data_Ls.append((x_val, y_val))
+        tst_data_ls.append((x_tst, y_tst))
+
+    return x_ohe, train_data_ls, val_data_Ls, tst_data_ls

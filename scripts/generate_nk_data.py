@@ -6,9 +6,9 @@ from src.pscapes import make_NK
 # define NK parameters
 
 AA_ALPHABET = 'ACDEFG' #amino acid alphabet for NK landscapes
-SEQ_LENGTH  = 6	#sequence length for NK models 
-K_VALS   	= list(range(SEQ_LENGTH)) # K values 
-REPLICATES  = 8
+SEQ_LENGTH = 6	#sequence length for NK models 
+K_VALS = list(range(SEQ_LENGTH)) # K values 
+REPLICATES = 8
 
 def main():
 	# for each possible K value
