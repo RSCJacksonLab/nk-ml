@@ -1,67 +1,68 @@
+from logging import raiseExceptions
+from xml.dom import NotFoundErr
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import numpy as np
-import sys
-sys.path.append('../../pscapes')
-sys.path.append('../../nk-ml-2024/')
-
-from torch.utils.data import DataLoader
-from pscapes.landscape_class import ProteinLandscape
-from pscapes.utils import dict_to_np_array, np_array_to_dict
-from src.architectures import SequenceRegressionCNN, SequenceRegressionLSTM, SequenceRegressionMLP, SequenceRegressionLinear, SequenceRegressionTransformer
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
-
-from src.modelling.ml_utils import train_val_test_split_ohe, train_model, landscapes_ohe_to_numpy
-
 import pickle
-from sklearn.metrics import r2_score, mean_squared_error
+
 from scipy.stats import pearsonr
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.metrics import r2_score, mean_squared_error
+from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader
+
+from src.modelling import train_model
+from src.modelling.architectures import *
+from src.pscapes import ProteinLandscape
 
 
-def read_CNN_hparams(best_params): 
-
+def read_CNN_hparams(best_params: dict): 
     """
-    Function to parse hyperparameters from an optuna study's best_params and return them in a form amenable for input into SequenceRegressionCNN instance. 
-
+    Parse hyperparameters from an optuna best_params and return them in
+    a form amenable for input into SequenceRegressionCNN instance. 
     """
+    num_conv_layers = best_params['num_conv_layers']
+    n_kernels = [int(best_params['n_kernels_layer{}'.format(i)]) 
+                 for i in range(num_conv_layers)]
+    kernel_sizes = [int(best_params['kernel_size_layer{}'.format(i)]) 
+                    for i in range(num_conv_layers)]
+    # make hparam dict
+    hparam_dict = {'num_conv_layers': num_conv_layers, 
+                   'n_kernels': n_kernels, 
+                   'kernel_sizes':kernel_sizes}
+    return hparam_dict
 
-    params = best_params
-    num_conv_layers = params['num_conv_layers']
-    n_kernels       = [int(params['n_kernels_layer{}'.format(i)]) for i in range(num_conv_layers)]
-    kernel_sizes    = [int(params['kernel_size_layer{}'.format(i)]) for i in range(num_conv_layers)]
-
-    param_dict = {'num_conv_layers':num_conv_layers, 'n_kernels': n_kernels, 'kernel_sizes':kernel_sizes}
-    return param_dict
-
-def read_MLP_hparams(best_params): 
-
+def read_MLP_hparams(best_params: dict): 
     """
-    Function to parse hyperparameters from an optuna study's best_params and return them in a form amenable for input into SequenceRegressionMLP instance. 
-
+    Parse hyperparameters from an optuna best_params and return them in
+    a form amenable for input into SequenceRegressionMLP instance. 
     """
     params=best_params
     n_hidden_layers = params['n_hidden_layers']    
-    hidden_sizes = [params['hidden{}_size'.format(i)] for i in range(n_hidden_layers)]
+    hidden_sizes = [params['hidden{}_size'.format(i)] 
+                    for i in range(n_hidden_layers)]
     param_dict  = {'hidden_sizes': hidden_sizes}
     return param_dict
 
-def read_LSTM_hparams(best_params): 
+def read_LSTM_hparams(best_params: dict): 
     """
-    Function to parse hyperparameters from an optuna study's best_params and return them in a form amenable for input into SequenceRegressionLSTM instance. 
-
+    Parse hyperparameters from an optuna best_params and return them in
+    a form amenable for input into SequenceRegressionLSTM instance. 
     """
     params = best_params
     num_layers  = params['num_layers']
     hidden_size = params['hidden_size']
-    param_dict = {'num_layers': num_layers, 'hidden_size': hidden_size}
+    param_dict = {'num_layers': num_layers, 
+                  'hidden_size': hidden_size}
     return param_dict
 
 
-def read_transformer_hparams(best_params): 
+def read_transformer_hparams(best_params: dict): 
     """
-    Function to parse hyperparameters from an optuna study's best_params and return them in a form amenable for input into SequenceRegressionTransformer instance. 
-
+    Parse hyperparameters from an optuna best_params and return them in 
+    a form amenable for input into SequenceRegressionTransformer 
+    instance.
     """
     params = best_params
     d_model = params['embed_dim_num_heads'][0]
@@ -69,82 +70,87 @@ def read_transformer_hparams(best_params):
     num_layers = params['num_layers']
     dim_feedforward = params['dim_feedforward']
     max_seq_length = params['max_seq_length']
-    param_dict = {'d_model': d_model, 'nhead': nheads, 'num_layers':num_layers,'dim_feedforward':dim_feedforward, 
-                 'max_seq_length': max_seq_length}
+    param_dict = {'d_model': d_model, 
+                  'nhead': nheads, 
+                  'num_layers': num_layers,
+                  'dim_feedforward': dim_feedforward, 
+                  'max_seq_length': max_seq_length}
     return param_dict
     
     
-def train_models_from_hparams_NK(hparams_dict, datapath, model_savepath, result_path, amino_acids, seq_length, 
-                                 n_replicates, n_epochs=30, patience=5, min_delta=1e-5):
+def train_models_from_hparams_NK(hparams_dict: dict,
+                                 datapath: str, 
+                                 model_savepath: str,
+                                 result_path: str, 
+                                 amino_acids: str,
+                                 seq_length: int, 
+                                 n_replicates: int,
+                                 n_epochs: int = 30,
+                                 patience: int = 5,
+                                 min_delta: float=1e-5):
     """
-    Performs training of a given model with a given set of hyperparameters against NK landscapes replicates. 
+    Trains a given model using a set of hyperparameters on NK landscape
+    replicates.
 
-    model (architectures.py object): model to train. Do not instantiate model with model() before passing. 
-    
-    hparams_path (str):              path to pickled list of optuna studies containing results of hyperparameter 
-                                     optimisation, with each list element containing the optuna study for the k-th NK landscape
-    datapath (str):                  path to csv files of nk landscapes, formatted as k{}_r{}.csv
-    amino_acids (str):               alphabet of amino acids used to create NK landscapes 
-    seq_length (int):                length of sequences in NK landscapes 
-    n_replicates (int):              number of replicate NK landscapes to load for each K value
-    
+    Parameters:
+    -----------
+    hparams_dict : dict
+        Dictionary of hyperparameters to use for training.
+
+    datapath : str
+        Path to CSV files of NK landscapes, formatted as `k{}_r{}.csv`.
+
+    model_savepath : str
+        Path to save the trained model.
+
+    result_path : str
+        Path to store the training results.
+
+    amino_acids : str
+        Alphabet of amino acids used to create NK landscapes.
+
+    seq_length : int
+        Length of sequences in NK landscapes.
+
+    n_replicates : int
+        Number of replicate NK landscapes to load for each K value.
+
+    n_epochs : int, optional (default=30)
+        Maximum number of epochs for training.
+
+    patience : int, optional (default=5)
+        Number of epochs with no improvement after which training will
+        stop.
+
+    min_delta : float, optional (default=1e-5)
+        Minimum change in the monitored quantity to qualify as an 
+        improvement.
+
     """
-    
-
-    hparam_studies = hparams_dict
-
-    
-
-        
-    landscapes = []
-    print('Loading landscapes.')
-    for k in range(seq_length):
-        replicate_list = []
-        for r in range(n_replicates):
-            landscape = ProteinLandscape(csv_path=datapath+'/k{0}_r{1}.csv'.format(k,r), amino_acids=amino_acids)
-            replicate_list.append(landscape)
-        landscapes.append(replicate_list)
-    landscapes = [[i.fit_OHE() for i in j] for j in landscapes]
-
-    print('Calculating train-test-val splits')
-    splits = [train_val_test_split_ohe(i, random_state=1) for i in landscapes] #this will split each landscape replicate in each K 
-                                                               #sublist into train-test-val splits
-    
-    #initialise some lists to collect results
-
     results = {}
-
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
     
-
-    
-    #loop over models 
-    for model_name in hparam_studies.keys(): 
-        print('Working on model name {}'.format(model_name))
- 
-                
-        studies  = hparam_studies[model_name]
-        assert len(landscapes) == len(studies), 'Number of K values does not match number of hyper-parameter studies.'
-
-        results[model_name] = {x:None for x in range(len(studies))}
-
-        for k_index, study in enumerate(studies): #we loop over studies under each model, which should be equal to K values 
-            print('Working on training for K = {}'.format(k_index))
-            k_results = {'test_r2':[], 'test_mse':[], 'test_pearson_r':[], 'train_epoch_losses':[], 'val_epoch_losses': [], 'predictions': [],'ground_truth':[]}
+    # for each model type
+    for model_name in hparams_dict.keys():
+        print('Working on model name {}'.format(model_name))       
+        studies = hparams_dict[model_name]
+        results[model_name] = {x: None for x in range(len(studies))}
+        
+        # iterate through each study and corresponding K value
+        for k, study in enumerate(studies):
+            print('Working on training for K = {}'.format(k))
+            # assign hyperparameters
             params = study.best_params
 
-
-        
-            
-            #extract model agnostic hparams. These don't apply to sklearn models 
+            # extract model agnostic hparams.
             if model_name!='RF' and model_name!='GB':             
-                lr              = params['lr']
-                batch_size      = params['batch_size']
+                lr = params['lr']
+                batch_size = params['batch_size']
                 
-            #extract model hparams 
+            # extract model hparams 
             if model_name == 'linear':
-                model_params = {'alphabet_size': len(amino_acids), 'sequence_length':seq_length}
+                model_params = {'alphabet_size': len(amino_acids), 
+                                'sequence_length':seq_length}
             elif model_name == 'mlp':
                 model_params = read_MLP_hparams(params) 
                 model_params['alphabet_size']= len(amino_acids)
@@ -164,28 +170,52 @@ def train_models_from_hparams_NK(hparams_dict, datapath, model_savepath, result_
             elif model_name == 'transformer': 
                 model_params = read_transformer_hparams(params)
                 model_params['input_dim']=len(amino_acids)
-            elif (model_name == 'RF') or (model_name == 'GB') :
-                model_params=params
+            elif (model_name == 'RF') or (model_name == 'GB'):
+                model_params = params
+            else:
+                raise NotFoundErr("Unknown model name.")
+            
+            print (
+                f"Hyperparameters: {model_params}, learning_rate: {lr}, "
+                f"batch_size: {batch_size}"
+            )
 
-            #construct Dataloaders by access appropriate data. Note that splits is structured as 
-            #[[K1_repl1, ...K1_repli], ..., [Kj_repl1, ..., Kj_repli]]. #Therefore, xy_train etc will be a list 
-            #where each element contains data for a replicate landscape
-            #such that xy_train = [repl1, repl2, ..., repli]
-            print ('Hyperparameters: {}, learning_rate: {}, batch_size: {}'.format(model_params, lr, batch_size))
-            
-            landscapes_ohe, xy_train, xy_val, xy_test, x_tests, y_tests = splits[k_index] 
-            x_train_np, y_train_np = landscapes_ohe_to_numpy(xy_train) #intialise flattened np arrays for RF and GB training 
-            x_val_np, y_val_np = landscapes_ohe_to_numpy(xy_val)
-            x_test_np, y_test_np = landscapes_ohe_to_numpy(xy_test)
+            k_results = {'test_r2': [], 
+                        'test_mse': [], 
+                        'test_pearson_r': [], 
+                        'train_epoch_losses': [], 
+                        'val_epoch_losses': [], 
+                        'predictions': [],
+                        'ground_truth': []}
 
-            
-            #print('model name: {}, model_params: {}, lr: {}, batch_size:{}'.format(model_name, model_params, lr, batch_size))
-            for replicate_index, replicate in enumerate(landscapes[k_index]): 
-                print('Training model {},  K= {}, replicate {}'.format(model_name, k_index, replicate_index))
-                if model_name !='RF' and model_name!='GB':   #different setup for sklearn models                 
-            
-                    pass
-                    #initialise model
+            # for each replicate
+            for replicate in range(n_replicates):
+                # load landscape csv file
+                landscape_csv_name = datapath + f'/k{k}_r{replicate}.csv'
+                landscape = ProteinLandscape(csv_path=landscape_csv_name,
+                                            amino_acids=amino_acids)
+                # load ohe and fitness data
+                x_ohe = np.array(landscape.ohe)
+                y = landscape.fitnesses.reshape(-1, 1).astype(float)
+
+                # make data splits
+                x_trn_outer, x_tst, y_trn_outer, y_tst = train_test_split(
+                    x_ohe,
+                    y 
+                    test_size=round(len(x_ohe) * 0.2),
+                    random_state=1,
+                )
+                x_trn, x_val, y_trn, y_val = train_test_split(
+                    x_trn_outer,
+                    y_trn_outer,
+                    test_size=round(len(x_trn_outer) * 0.2),
+                    random_state=1
+                )            
+
+                # if pytorch model
+                if model_name !='RF' and model_name!='GB':
+
+                    # initialise model
                     if model_name=='linear': 
                         model_instance = SequenceRegressionLinear(**model_params)
                     elif model_name=='mlp': 
@@ -198,45 +228,69 @@ def train_models_from_hparams_NK(hparams_dict, datapath, model_savepath, result_
                         model_instance = SequenceRegressionLSTM(**model_params)
                     elif model_name=='transformer': 
                         model_instance = SequenceRegressionTransformer(**model_params)
+                    else:
+                        raise NotFoundErr("Unknown model name provided.")
 
-                    #initialise loss and optimizer
-                    loss_fn   = nn.MSELoss()
+                    # initialise loss and optimizer
+                    loss_fn = nn.MSELoss()
                     optimizer = optim.Adam(model_instance.parameters(), lr=lr)
                 
-                    #load dataloaders
-                    train_dataloader = DataLoader(xy_train[replicate_index], batch_size=batch_size, shuffle=True)
-                    val_dataloader   = DataLoader(xy_val[replicate_index], batch_size=batch_size)
-            
-                    #train model
-                    _, train_epoch_losses, val_epoch_losses = train_model(model_instance, optimizer, loss_fn, 
-                                                                          train_dataloader, 
-                                                                          val_dataloader,  n_epochs=n_epochs, device=device,
-                                                                          patience=patience, min_delta=min_delta)
-                    #save model 
-                    savepath = model_savepath+'/{0}_NK_k{1}_r{2}.pt'.format(model_name, k_index, replicate_index)
+                    # Prepare dataloaders
+                    # convert to PyTorch tensors
+                    x_trn_pt = torch.from_numpy(x_trn).float()
+                    y_trn_pt = torch.from_numpy(y_trn).float()
+
+                    x_val_pt = torch.from_numpy(x_val).float()
+                    y_val_pt = torch.from_numpy(y_val).float()
+
+                    # combine into a list of tuples
+                    trn_dset = list(zip(x_trn_pt, y_trn_pt))
+                    val_dset = list(zip(x_val_pt, y_val_pt))
+
+                    # make dataloaders
+                    train_dataloader = DataLoader(
+                        trn_dset, 
+                        batch_size=batch_size, 
+                        shuffle=True
+                    )
+                    val_dataloader = DataLoader(
+                        val_dset, 
+                        batch_size=batch_size
+                    )
+                    # train model
+                    _, train_epoch_losses, val_epoch_losses = train_model(
+                        model_instance, 
+                        optimizer, 
+                        loss_fn, 
+                        train_dataloader, 
+                        val_dataloader,
+                        n_epochs=n_epochs,
+                        device=device,
+                        patience=patience,
+                        min_delta=min_delta)
+                    
+                    # save model 
+                    model_file_name = (
+                        f'/{model_name}_NK_k{k}_r{replicate}.pt'
+                    )
+                    savepath = model_savepath + model_file_name
                     torch.save(model_instance.state_dict(), savepath)
 
-                    #evaluate model on test data
+                    # evaluate model on test data
                     model_instance.eval()
-        
-                    x_test   = x_tests[replicate_index].to(device)
-                    y_test   = y_tests[replicate_index].to(device) 
+                    x_tst_pt = torch.from_numpy(x_tst).float().to(device)
+                    y_tst_pt = torch.from_numpy(y_tst).float()
                     
-                    y_pred   = model_instance(x_test) #get predictions
-                    y_pred   = y_pred.detach() #detach tensors 
-                    y_test   = y_test.detach()
+                    y_pred = model_instance(x_tst_pt)
+                    y_pred = y_pred.detach()
                     
-                    test_mse = loss_fn(y_pred, y_test) #MSE 
+                    # eval performance
+                    test_mse = loss_fn(y_pred, y_tst_pt)
+                    y_pred, y_test = y_pred.cpu(), y_tst_pt
+                    test_pearson_r = pearsonr(y_pred, y_test)                      
+                    test_r2  = r2_score(y_pred, y_test)
 
-                    y_pred, y_test   = y_pred.cpu(), y_test.cpu() #send to cpu for scipy pearson and sklearn r2
-                    
-                    test_pearson_r = pearsonr(y_pred, y_test) #Pearson rho                       
-                                              
-                    test_r2  = r2_score(y_pred, y_test) #R^2
-
-                    
-
-                    #collect data 
+                    # collect data 
                     k_results['test_r2'].append(test_r2)
                     k_results['test_mse'].append(test_mse)
                     k_results['test_pearson_r'].append(test_pearson_r)
@@ -244,65 +298,40 @@ def train_models_from_hparams_NK(hparams_dict, datapath, model_savepath, result_
                     k_results['val_epoch_losses'].append(val_epoch_losses)
                     k_results['predictions'].append(y_pred)
                     k_results['ground_truth'].append(y_test)
-                else: #now we deal with RF and GB 
-                    if model_name == 'RF': 
-                        model_instance = RandomForestRegressor(**model_params, n_jobs=-1)
-                    elif model_name == 'GB': 
-                        model_instance = GradientBoostingRegressor(**model_params)
-                    model_instance.fit(x_train_np[replicate_index], y_train_np[replicate_index].ravel())
-                    y_pred   = model_instance.predict(x_test_np[replicate_index])
-                    y_test   = y_test_np[replicate_index].ravel()
-
-                    test_mse  = mean_squared_error(y_test, y_pred)
-                    test_r2   =  r2_score(y_test, y_pred)
-                    test_pearson_r = pearsonr(y_test, y_pred)
-
                     
+                # if sklearn model
+                else:
+                    if model_name == 'RF': 
+                        model_instance = RandomForestRegressor(
+                            **model_params, 
+                            n_jobs=-1
+                        )
+                    elif model_name == 'GB': 
+                        model_instance = GradientBoostingRegressor(
+                            **model_params
+                        )
+                    else:
+                        raise NotFoundErr("Unknown model name provided.")
+                    
+                    model_instance.fit(x_trn, y_trn.ravel())
+                    y_pred = model_instance.predict(x_tst)
+                    y_test = y_tst.ravel()
+
+                    # eval performance
+                    test_mse = mean_squared_error(y_test, y_pred)
+                    test_r2 =  r2_score(y_test, y_pred)
+                    test_pearson_r = pearsonr(y_test, y_pred)
+                    
+                    # collect data 
                     k_results['test_r2'].append(test_r2)
                     k_results['test_mse'].append(test_mse)
                     k_results['test_pearson_r'].append(test_pearson_r)
-                    
-                
-                
-            #update results dictionary 
-            results[model_name][k_index] = k_results 
-            with open(result_path+'/NK_train_test_results.pkl', 'wb') as handle: #overwrite results at each model k value
-                pickle.dump(results, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
+                        
+            #u pdate results dictionary 
+            results[model_name][k] = k_results 
+             # overwrite results at each model k value
+            with open(result_path+'/NK_train_test_results.pkl', 'wb') as f:
+                pickle.dump(results, f, protocol=pickle.HIGHEST_PROTOCOL)
     
     print('Training and testing finished. Results written to disk.')
-    return results      
-
-def instantiate_model_from_study(model_name, study, alphabet_size=6, seq_length=6): 
-    if model_name == 'linear':
-        model_instance = SequenceRegressionLinear(alphabet_size=alphabet_size, sequence_length=seq_length)
-    elif model_name == 'mlp': 
-        hparams = read_MLP_hparams(study.best_params)
-        model_instance = SequenceRegressionMLP(**hparams, alphabet_size=alphabet_size, sequence_length=seq_length)
-    elif model_name == 'cnn': 
-        hparams = read_CNN_hparams(study.best_params)
-        model_instance = SequenceRegressionCNN(**hparams, input_channels=alphabet_size, sequence_length=seq_length)
-    elif model_name == 'ulstm': 
-        hparams = read_LSTM_hparams(study.best_params)
-        model_instance = SequenceRegressionLSTM(**hparams, input_size=alphabet_size, bidirectional=False)
-    elif model_name == 'blstm': 
-        hparams = read_LSTM_hparams(study.best_params)
-        model_instance = SequenceRegressionLSTM(**hparams, input_size=alphabet_size, bidirectional=True)
-    elif model_name == 'transformer': 
-        hparams = read_transformer_hparams(study.best_params)
-        model_instance = SequenceRegressionTransformer(**hparams, input_dim=alphabet_size)
-    elif model_name == 'RF': 
-        hparams = study.best_params
-        model_instance = RandomForestRegressor(**hparams)
-    elif model_name == 'GB': 
-        hparams = study.best_params
-        model_instance = GradientBoostingRegressor(**hparams)
-    else: 
-        raise Exception('Unknown model name.')
-    return model_instance                  
-
-
-
-
-            
- 
+    return results                    
