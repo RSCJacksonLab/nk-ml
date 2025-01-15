@@ -1,13 +1,172 @@
 '''
 Neural network architectures implemented in PyTorch.
 '''
+import inspect
 import math
+import numpy as np
 import torch
 import torch.nn as nn
 
-from typing import List
+from numpy.typing import ArrayLike
+from scipy.stats import pearsonr
+from sklearn.metrics import r2_score
+from torch.utils.data import DataLoader, random_split
+from typing import List, Literal, Optional, Tuple
 
-class SequenceRegressionLinear(nn.Module): 
+from modelling.data_utils import make_dataset
+from modelling.ml_utils import train_model
+
+# for mapping model names to class
+MODEL_MAPPING = {
+    'linear': SequenceRegressionLinear,
+    'mlp': SequenceRegressionMLP,
+    'cnn': SequenceRegressionCNN,
+    'lstm': SequenceRegressionLSTM,
+    'transformer': SequenceRegressionTransformer,
+}
+
+class NeuralNetworkRegression(nn.Module):
+    '''
+    Wrapper for Regressor models to manage train and score methods.
+
+    Parameters:
+    -----------
+    model_name : str
+        Name of the model. Options include: `linear`, `mlp`, `cnn`,
+        `lstm`, `transformer`
+
+    **kwargs
+        Key word arguments for specific model instantiation.
+    '''
+
+    def __init__(self, 
+                 model_name: Literal[
+                     'linear', 'mlp', 'cnn', 'lstm', 'transformer'
+                 ], 
+                 **kwargs):
+        model_class = MODEL_MAPPING[model_name]
+        
+        # get model agnostic hparams
+        self.lr = kwargs.get('lr', 0.001)
+        self.batch_size = kwargs.get('batch_size', 16)
+
+        # get relevant kwargs
+        model_kwargs = inspect.signature(model_class)
+        kwargs_filtered = {
+            hparam: value for hparam, value in kwargs.items()
+            if hparam in model_kwargs.parameters
+        }
+        # instantiate model
+        self.model = model_class(**kwargs_filtered)
+
+    def fit(
+        self, 
+        train_data: Tuple[ArrayLike, ArrayLike],
+        val_data: Optional[Tuple[ArrayLike, ArrayLike]] = None,
+        ) -> Tuple[dict, dict]:
+        '''
+        Train model on provided data. Will make validation data
+        automatically if not provided for early stopping.
+
+        Parameters:
+        -----------
+        train_data : Tuple[ArrayLike, ArrayLike]
+            Training data containing features (x) as first element and
+            target (y) as second.
+
+        val_data : Optional[Tuple[ArrayLike, ArrayLike]]
+            Optional validation data containing features (x) as first 
+            element and target (y) as second. If not provided, the train
+            data will be used to generate a validation dataset.
+        '''
+        # convert data into dataset
+        trn_dset = make_dataset(train_data)
+
+        # get validation set
+        if val_data is not None:
+            val_dset = make_dataset(val_data)
+        else:
+            random_state = torch.Generator().manual_seed(0)
+            trn_dset, val_dset = random_split(trn_dset, 
+                                              [0.8, 0.2], 
+                                              generator=random_state)
+        
+        # make dataloaders
+        trn_dloader = DataLoader(trn_dset, self.batch_size, shuffle=True)
+        val_dloader = DataLoader(val_dset, self.batch_size, shuffle=False)
+
+        # initialise optimizer and loss fn
+        self.model.train()
+        loss_fn = nn.MSELoss()
+        optimizer = torch.optim.Adam(self.model.parameters(), 
+                                     lr=self.lr)
+        
+        model, trn_loss_ls, val_loss_ls = train_model(
+            self.model,
+            optimizer,
+            loss_fn,
+            trn_dloader,
+            val_dloader,
+            device='cuda' if torch.cuda.is_available() else 'cpu')
+        self.model = model
+        self.trn_loss_ls = trn_loss_ls
+        self.val_loss_ls = val_loss_ls
+
+        # get full scoring for train and validation data
+        train_res = self.score(trn_dloader)
+        val_res = self.score(val_dloader)
+
+        return train_res, val_res
+
+    def score(
+        self,
+        dloader: DataLoader
+    ) -> dict:
+        '''
+        Score model performance on provided data.
+
+        Parameters:
+        -----------
+        dloader : Tuple[ArrayLike, ArrayLike]
+            Data containing features (x) as first element and
+            target (y) as second.
+        '''
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        
+        self.model.to(device)
+        self.model.eval()
+
+        total_loss = 0
+        all_preds = []
+        all_targets = []
+        
+        # get loss + predictions 
+        loss_fn = nn.MSELoss()
+        with torch.no_grad():
+            for inputs, targets in dloader:
+                inputs, targets = inputs.to(device), targets.to(device)
+                outputs = self.model(inputs)
+                loss = loss_fn(outputs, targets)
+                total_loss += loss.item()
+                all_preds.append(outputs.cpu().numpy())
+                all_targets.append(targets.cpu().numpy())
+
+        all_preds = np.concatenate(all_preds, axis=0)
+        all_targets = np.concatenate(all_targets, axis=0)
+
+        # get performance metrics
+        pearson_r, _ = pearsonr(all_preds.flatten(),
+                                all_targets.flatten())
+        r2 = r2_score(all_targets, all_preds)
+        avg_loss = total_loss / len(dloader)
+
+        return {
+            'pearson_r': pearson_r,
+            'r2': r2,
+            'loss': avg_loss
+        }
+
+class SequenceRegressionLinear(NeuralNetworkRegression): 
     '''
     Linear regression with PyTorch.
 
@@ -36,7 +195,7 @@ class SequenceRegressionLinear(nn.Module):
         return x
 
 
-class SequenceRegressionMLP(nn.Module):
+class SequenceRegressionMLP(NeuralNetworkRegression):
     '''
     Multi-layer perceptron (MLP) in PyTorch.
 
@@ -78,7 +237,7 @@ class SequenceRegressionMLP(nn.Module):
         return x
     
 
-class SequenceRegressionCNN(nn.Module):
+class SequenceRegressionCNN(NeuralNetworkRegression):
     def __init__(self, 
                  input_channels: int = 20, 
                  sequence_length: int = 50, 
@@ -167,7 +326,7 @@ class SequenceRegressionCNN(nn.Module):
         return output
 
 
-class SequenceRegressionLSTM(nn.Module):
+class SequenceRegressionLSTM(NeuralNetworkRegression):
     '''
     LSTM for sequence regression in PyTorch.
 
@@ -233,7 +392,7 @@ class SequenceRegressionLSTM(nn.Module):
         return output
 
 
-class PositionalEncoding(nn.Module):
+class PositionalEncoding(NeuralNetworkRegression):
     '''Positional encoding fn for tx module.'''
     def __init__(self, d_model, max_len=10):
         super(PositionalEncoding, self).__init__()
@@ -256,7 +415,7 @@ class PositionalEncoding(nn.Module):
         x = x + self.pe[:x.size(0), :]
         return x
 
-class SequenceRegressionTransformer(nn.Module):
+class SequenceRegressionTransformer(NeuralNetworkRegression):
     '''
     Transformer for sequence regression.
 
