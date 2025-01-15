@@ -1,15 +1,13 @@
-import numpy as np
+'''
+Functions for ML training.
+'''
 import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
 
 from datetime import datetime
-from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
-from typing import List
-
-from src.pscapes import ProteinLandscape
 
 class EarlyStopping:
     def __init__(self, 
@@ -61,7 +59,7 @@ def train_model(model: nn.Module,
                 optimizer: optim.Optimizer,
                 loss_fn: nn.modules.loss._Loss, 
                 train_loader: DataLoader, 
-                val_loader: DataLoader,
+                val_loader: Optional[DataLoader] = None,
                 n_epochs: int = 30,
                 patience: int = 5, 
                 min_delta: float = 1e-5,
@@ -153,7 +151,7 @@ def train_model(model: nn.Module,
     # Load the best model after early stopping
     model.load_state_dict(torch.load(early_stopping.path))
 
-    #delete best model from early stopiig from disk 
+    # delete best model from early stopiig from disk 
     if os.path.exists(early_stopping.path):
       os.remove(early_stopping.path)
     else:

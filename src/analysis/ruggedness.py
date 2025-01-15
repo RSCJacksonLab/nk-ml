@@ -1,18 +1,7 @@
-import torch
-import torch.nn as nn
-from sklearn.neighbors import kneighbors_graph
-
-import math
-import networkx as nx
-from scipy.sparse import diags
-
-import sys
-sys.path.append('../../pscapes')
-sys.path.append('../../nk-ml-2024/')
-from scipy.sparse.linalg import eigsh
-
 import numpy as np
 
+from scipy.sparse import diags
+from sklearn.neighbors import kneighbors_graph
 
 
 def get_latent_representation(model, model_name,  x_data):
