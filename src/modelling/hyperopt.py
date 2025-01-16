@@ -12,13 +12,14 @@ from sklearn.metrics import mean_squared_error
 from torch.utils.data import DataLoader
 from typing import Any, Dict, List
 
-from src.modelling.architectures import(SequenceRegressionCNN, 
-                                        SequenceRegressionLinear, 
-                                        SequenceRegressionMLP, 
-                                        SequenceRegressionLSTM, 
-                                        SequenceRegressionTransformer)
+from modelling.architectures import(SequenceRegressionCNN, 
+                                    SequenceRegressionLinear, 
+                                    SequenceRegressionMLP, 
+                                    SequenceRegressionLSTM, 
+                                    SequenceRegressionTransformer)
+from modelling import make_dataset
 
-torch.backends.nnpack.enabled = False
+# torch.backends.nnpack.enabled = False
 
 class EarlyStoppingHparamOpt:
     """Class for early stopping during hparam optimisation"""
@@ -173,15 +174,17 @@ def get_tx_hparam_combinations(embed_dim_options: List[int],
     
     return valid_combinations
    
-def objective_fn(trial: opt.Trial,
-                search_space: Dict[str, Any],
-                model: nn.Module,
-                train_data: Any,
-                val_data: Any,
-                n_epochs: int = 30,
-                patience: int = 5,
-                min_delta: float = 1e-5,
-                device: str = 'cuda') -> float:
+def objective_fn(alphabet_len: int,
+                 sequence_len: int,
+                 trial: opt.Trial,
+                 search_space: Dict[str, Any],
+                 model: nn.Module,
+                 train_data: Any,
+                 val_data: Any,
+                 n_epochs: int = 30,
+                 patience: int = 5,
+                 min_delta: float = 1e-5,
+                 device: str = 'cuda') -> float:
     """
     Perform hyperparameter optimization on a given model. The search space 
     is defined in h_param_search_space as a dictionary, where keys are model 
@@ -190,43 +193,49 @@ def objective_fn(trial: opt.Trial,
 
     Parameters:
     -----------
-        trial (optuna.trial.Trial): 
-            Optuna trial object.
+    alphabet_len : int
+        Number of tokens/classes allowed per site
 
-        search_space (Dict[str, Any]): 
-            Dictionary defining hyperparameters to optimize. Keys are 
-            parameter names, and values are either fixed values or Optuna 
-            samplers. Example: 
-            {'learning_rate': trial.suggest_categorical(
-                'lr', [0.01, 0.001, 0.0001]
-             ), 'sequence_length': 5}.
+    sequence_len : int
+        Length of training data sequences. 
 
-        model (nn.Module): 
-            Model to optimize. Do NOT instantiate it (i.e., avoid model()).
+    trial (optuna.trial.Trial): 
+        Optuna trial object.
 
-        train_data (Any): 
-            Training data.
+    search_space (Dict[str, Any]): 
+        Dictionary defining hyperparameters to optimize. Keys are 
+        parameter names, and values are either fixed values or Optuna 
+        samplers. Example: 
+        {'learning_rate': trial.suggest_categorical(
+            'lr', [0.01, 0.001, 0.0001]
+            ), 'sequence_length': 5}.
 
-        val_data (Any): 
-            Validation data.
+    model (nn.Module): 
+        Model to optimize. Do NOT instantiate it (i.e., avoid model()).
 
-        n_epochs (int, optional): 
-            Number of epochs to train. Defaults to 30.
+    train_data (Any): 
+        Training data.
 
-        patience (int, optional): 
-            Patience value for early stopping. Defaults to 5.
+    val_data (Any): 
+        Validation data.
 
-        min_delta (float, optional): 
-            Minimum delta for early stopping. Defaults to 1e-5.
+    n_epochs (int, optional): 
+        Number of epochs to train. Defaults to 30.
 
-        device (str, optional): 
-            Device for PyTorch computations (e.g., 'cuda' or 'cpu'). 
-            Defaults to 'cuda'.
+    patience (int, optional): 
+        Patience value for early stopping. Defaults to 5.
+
+    min_delta (float, optional): 
+        Minimum delta for early stopping. Defaults to 1e-5.
+
+    device (str, optional): 
+        Device for PyTorch computations (e.g., 'cuda' or 'cpu'). 
+        Defaults to 'cuda'.
 
     Returns:
     --------
-        val_loss : float 
-            Best validation loss achieved during training.
+    val_loss : float 
+        Best validation loss achieved during training.
     """
 
     # define search spaces based on model
@@ -237,8 +246,8 @@ def objective_fn(trial: opt.Trial,
     print(model) 
     if model==SequenceRegressionLinear:
         print (model)
-        model_instance = model(alphabet_size=search_space['alphabet_size'], 
-                               sequence_length=search_space['sequence_length'])
+        model_instance = model(alphabet_size=alphabet_len, 
+                               sequence_length=sequence_len)
         
     elif model==SequenceRegressionMLP:
         n_hidden_layers = trial.suggest_int('n_hidden_layers',
@@ -252,8 +261,8 @@ def objective_fn(trial: opt.Trial,
             )
             for i in range(n_hidden_layers)
         ]
-        model_instance = model(alphabet_size=search_space['alphabet_size'], 
-                               sequence_length=search_space['sequence_length'], 
+        model_instance = model(alphabet_size=alphabet_len, 
+                               sequence_length=sequence_len, 
                                hidden_sizes=hidden_sizes)
 
     elif model==SequenceRegressionCNN:
@@ -273,8 +282,8 @@ def objective_fn(trial: opt.Trial,
                                   search_space['kernel_sizes_max'], 2))
             for i in range(num_conv_layers)
         ]
-        model_instance = model(input_channels=search_space['alphabet_size'],
-                               sequence_length=search_space['sequence_length'],
+        model_instance = model(input_channels=alphabet_len,
+                               sequence_length=sequence_len,
                                num_conv_layers=num_conv_layers,
                                n_kernels=n_kernels,
                                kernel_sizes=kernel_sizes)
@@ -286,7 +295,7 @@ def objective_fn(trial: opt.Trial,
         hidden_size = trial.suggest_categorical("hidden_size",
                                                 search_space['hidden_sizes'])
         bidirectional  = search_space['bidirectional']               
-        model_instance = model(input_size=search_space['alphabet_size'],
+        model_instance = model(input_size=alphabet_len,
                                hidden_size=hidden_size,
                                num_layers=num_layers, 
                                bidirectional=bidirectional)
@@ -314,7 +323,7 @@ def objective_fn(trial: opt.Trial,
             "max_seq_length",
             search_space['max_seq_lengths']
         )                   
-        model_instance = model(input_dim=search_space['alphabet_size'],
+        model_instance = model(input_dim=alphabet_len,
                                d_model=d_model,
                                nhead=nhead,
                                dim_feedforward=dim_feedforward,
@@ -329,8 +338,11 @@ def objective_fn(trial: opt.Trial,
 
 
     #train and val loaders 
-    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_data, batch_size=batch_size)
+    train_loader = DataLoader(make_dataset(train_data), 
+                              batch_size=batch_size, 
+                              shuffle=True)
+    val_loader = DataLoader(make_dataset(val_data), 
+                            batch_size=batch_size)
 
     #run train/val
     val_loss = optimise_hparams(trial, 
@@ -346,12 +358,12 @@ def objective_fn(trial: opt.Trial,
     return val_loss
 
 
-def sklearn_objective(trial, 
-                      model_name: str, 
-                      x_train: ArrayLike, 
-                      y_train: ArrayLike,
-                      x_val: ArrayLike, 
-                      y_val: ArrayLike) -> float:
+def sklearn_objective_fn(trial, 
+                        model_name: str, 
+                        x_train: ArrayLike, 
+                        y_train: ArrayLike,
+                        x_val: ArrayLike, 
+                        y_val: ArrayLike) -> float:
     """
     Perform hyperparameter optimization for a scikit-learn model.
 

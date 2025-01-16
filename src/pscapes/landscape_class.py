@@ -17,7 +17,6 @@ import tqdm as tqdm
 from colorama import Fore, Style
 from functools import partial, reduce
 from numpy.typing import ArrayLike
-from pathlib import Path
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
 from typing import Literal, Optional, Union
@@ -138,12 +137,12 @@ class ProteinLandscape():
                  seed_seq: Optional[str] = None,
                  seed_id: int = 0,
                  graph: bool = False,
-                 csv_path: Optional[Path] = None,
+                 csv_path: Optional[str] = None,
                  custom_columns: dict = {"x_data": "sequence",
                                          "y_data": "fitness",
                                          "index_col": None},
                 amino_acids: str='ACDEFGHIKLMNPQRSTVWY',
-                saved_file: Optional[Path] = None,
+                saved_file: Optional[str] = None,
                 ):
         
         if saved_file is not None:
@@ -360,7 +359,7 @@ class ProteinLandscape():
         return hammings
         
     @staticmethod
-    def csv_dloader(csv_file: Path,
+    def csv_dloader(csv_file: str,
                     x_data: str = "Sequence",
                     y_data: str = "Fitness",
                     index_col: Optional[int] = None):

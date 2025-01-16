@@ -8,6 +8,83 @@ import torch.optim as optim
 
 from datetime import datetime
 from torch.utils.data import DataLoader
+from typing import Optional
+
+
+def read_CNN_hparams(best_params: dict): 
+    """
+    Parse hyperparameters from an optuna best_params and return them in
+    a form amenable for input into SequenceRegressionCNN instance. 
+    """
+    num_conv_layers = best_params['num_conv_layers']
+    n_kernels = [int(best_params['n_kernels_layer{}'.format(i)]) 
+                 for i in range(num_conv_layers)]
+    kernel_sizes = [int(best_params['kernel_size_layer{}'.format(i)]) 
+                    for i in range(num_conv_layers)]
+    # make hparam dict
+    hparam_dict = {'num_conv_layers': num_conv_layers, 
+                   'n_kernels': n_kernels, 
+                   'kernel_sizes':kernel_sizes}
+    return hparam_dict
+
+def read_MLP_hparams(best_params: dict): 
+    """
+    Parse hyperparameters from an optuna best_params and return them in
+    a form amenable for input into SequenceRegressionMLP instance. 
+    """
+    params=best_params
+    n_hidden_layers = params['n_hidden_layers']    
+    hidden_sizes = [params['hidden{}_size'.format(i)] 
+                    for i in range(n_hidden_layers)]
+    param_dict  = {'hidden_sizes': hidden_sizes}
+    return param_dict
+
+def read_LSTM_hparams(best_params: dict): 
+    """
+    Parse hyperparameters from an optuna best_params and return them in
+    a form amenable for input into SequenceRegressionLSTM instance. 
+    """
+    params = best_params
+    num_layers  = params['num_layers']
+    hidden_size = params['hidden_size']
+    param_dict = {'num_layers': num_layers, 
+                  'hidden_size': hidden_size}
+    return param_dict
+
+
+def read_transformer_hparams(best_params: dict): 
+    """
+    Parse hyperparameters from an optuna best_params and return them in 
+    a form amenable for input into SequenceRegressionTransformer 
+    instance.
+    """
+    params = best_params
+    d_model = params['embed_dim_num_heads'][0]
+    nheads  = params['embed_dim_num_heads'][1]
+    num_layers = params['num_layers']
+    dim_feedforward = params['dim_feedforward']
+    max_seq_length = params['max_seq_length']
+    param_dict = {'d_model': d_model, 
+                  'nhead': nheads, 
+                  'num_layers': num_layers,
+                  'dim_feedforward': dim_feedforward, 
+                  'max_seq_length': max_seq_length}
+    return param_dict
+
+def get_model_hparams(model_name: str, best_params: dict):
+    '''
+    Given model name read Optuna best_params and make dict.
+    '''
+    name_to_param = {
+        'cnn': read_CNN_hparams,
+        'mlp': read_MLP_hparams,
+        'ulstm': read_LSTM_hparams,
+        'blstm': read_LSTM_hparams,
+        'transformer': read_transformer_hparams,
+    }
+    parse_fn = name_to_param[model_name]
+    param_dict = parse_fn(best_params)
+    return param_dict
 
 
 class EarlyStopping:

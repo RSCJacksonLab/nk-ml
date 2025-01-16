@@ -24,7 +24,7 @@ from pscapes.utils import dict_to_np_array, np_array_to_dict
 from src.architectures import SequenceRegressionCNN, SequenceRegressionLinear, SequenceRegressionMLP, SequenceRegressionLSTM, SequenceRegressionTransformer
 
 from src.modelling.ml_utils import train_val_test_split_ohe, landscapes_ohe_to_numpy
-from hyperopt import objective, sklearn_objective
+from hyperopt import objective_fn, sklearn_objective
 
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor 
 from colorama import Fore
@@ -51,7 +51,7 @@ def run_hparam_opt():
     PATIENCE = 20
     MIN_DELTA = 1e-6
     learning_rates = [0.01, 0.001, 0.0001]
-    batch_sizes    = [32, 64, 128, 256]
+    batch_sizes    = 
 
     #N_TRIALS = 64
     n_epochs = 300

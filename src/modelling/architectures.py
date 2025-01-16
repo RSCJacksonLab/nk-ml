@@ -16,14 +16,6 @@ from typing import List, Literal, Optional, Tuple
 from modelling.data_utils import make_dataset
 from modelling.ml_utils import train_model
 
-# for mapping model names to class
-MODEL_MAPPING = {
-    'linear': SequenceRegressionLinear,
-    'mlp': SequenceRegressionMLP,
-    'cnn': SequenceRegressionCNN,
-    'lstm': SequenceRegressionLSTM,
-    'transformer': SequenceRegressionTransformer,
-}
 
 class NeuralNetworkRegression(nn.Module):
     '''
@@ -482,3 +474,13 @@ class SequenceRegressionTransformer(NeuralNetworkRegression):
         # Shape: (batch_size, 1)
         output = self.fc_out(final_out)
         return output
+    
+# for mapping model names to class
+MODEL_MAPPING = {
+    'linear': SequenceRegressionLinear,
+    'mlp': SequenceRegressionMLP,
+    'cnn': SequenceRegressionCNN,
+    'ulstm': SequenceRegressionLSTM,
+    'blstm': SequenceRegressionLSTM,
+    'transformer': SequenceRegressionTransformer,
+}
