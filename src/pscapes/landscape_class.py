@@ -177,7 +177,7 @@ class ProteinLandscape():
         # data is stored with sequences in the first column and fitnesses
         self.sequences = self.data[:, 0]
         self.fitnesses = self.data[:, 1]
-        self.ohe = self.return_ohe(self.sequences)
+        self.ohe = self.return_ohe()
 
         # assign sequence properties
         if seed_seq:
@@ -197,7 +197,7 @@ class ProteinLandscape():
         self.sequence_mutation_locations = self.boolean_mutant_array()
 
         # get neighbors for each sequence
-        self.mutation_arrs = self.gen_mutation_arrays()
+        self.mutation_arrays = self.gen_mutation_arrays()
 
         subsets = {x : [] for x in range(seq_len+1)}
         self.hammings = self.hamming_array()
@@ -391,6 +391,8 @@ class ProteinLandscape():
             Returns an Nx2 array with the first column being x_data
             (sequences), and the second being y_data (fitnesses).
         '''
+        import os
+        print(os.getcwd())
         data = pd.read_csv(csv_file, index_col=index_col)
         protein_data = data[[x_data, y_data]].to_numpy()
         return protein_data
@@ -832,8 +834,8 @@ class ProteinLandscape():
             else:
                 pool = mp.Pool(mp.cpu_count())
 
-        mapfunc = partial(self.calc_neighbours,token_dict=token_dict)
-        results = pool.map(mapfunc,tqdm.tqdm(dataset))
+        mapfunc = partial(self.calc_neighbours, token_dict=token_dict)
+        results = pool.map(mapfunc, tqdm.tqdm(dataset))
         neighbours = {tuple(key) : value for key, value in results}
         return neighbours
     

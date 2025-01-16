@@ -31,7 +31,7 @@ class NeuralNetworkRegression(nn.Module):
         Key word arguments for specific model instantiation.
     '''
 
-    def __init__(self, 
+    def __init__(self,
                  model_name: Literal[
                      'linear', 'mlp', 'cnn', 'lstm', 'transformer'
                  ], 
@@ -158,7 +158,7 @@ class NeuralNetworkRegression(nn.Module):
             'loss': avg_loss
         }
 
-class SequenceRegressionLinear(NeuralNetworkRegression): 
+class SequenceRegressionLinear(nn.Module): 
     '''
     Linear regression with PyTorch.
 
@@ -176,7 +176,7 @@ class SequenceRegressionLinear(NeuralNetworkRegression):
         self.alphabet_size   = alphabet_size
         self.sequence_length = sequence_length
         input_size = self.alphabet_size * self.sequence_length
-        self.linear = nn.Linear(input_size, 1)
+        self.model = nn.Linear(input_size, 1)
 
     def forward(self, x):
         # flatten the input [batch_size, sequence_length, alphabet_size]
@@ -187,7 +187,7 @@ class SequenceRegressionLinear(NeuralNetworkRegression):
         return x
 
 
-class SequenceRegressionMLP(NeuralNetworkRegression):
+class SequenceRegressionMLP(nn.Module):
     '''
     Multi-layer perceptron (MLP) in PyTorch.
 
@@ -229,7 +229,7 @@ class SequenceRegressionMLP(NeuralNetworkRegression):
         return x
     
 
-class SequenceRegressionCNN(NeuralNetworkRegression):
+class SequenceRegressionCNN(nn.Module):
     def __init__(self, 
                  input_channels: int = 20, 
                  sequence_length: int = 50, 
@@ -318,7 +318,7 @@ class SequenceRegressionCNN(NeuralNetworkRegression):
         return output
 
 
-class SequenceRegressionLSTM(NeuralNetworkRegression):
+class SequenceRegressionLSTM(nn.Module):
     '''
     LSTM for sequence regression in PyTorch.
 
@@ -384,7 +384,7 @@ class SequenceRegressionLSTM(NeuralNetworkRegression):
         return output
 
 
-class PositionalEncoding(NeuralNetworkRegression):
+class PositionalEncoding(nn.Module):
     '''Positional encoding fn for tx module.'''
     def __init__(self, d_model, max_len=10):
         super(PositionalEncoding, self).__init__()
@@ -407,7 +407,7 @@ class PositionalEncoding(NeuralNetworkRegression):
         x = x + self.pe[:x.size(0), :]
         return x
 
-class SequenceRegressionTransformer(NeuralNetworkRegression):
+class SequenceRegressionTransformer(nn.Module):
     '''
     Transformer for sequence regression.
 
