@@ -4,6 +4,7 @@ Neural network architectures implemented in PyTorch.
 import inspect
 import math
 import numpy as np
+from pydantic import NoneStr
 import torch
 import torch.nn as nn
 
@@ -36,6 +37,7 @@ class NeuralNetworkRegression(nn.Module):
                      'linear', 'mlp', 'cnn', 'lstm', 'transformer'
                  ], 
                  **kwargs):
+        super().__init__()
         model_class = MODEL_MAPPING[model_name]
         
         # get model agnostic hparams
@@ -55,7 +57,10 @@ class NeuralNetworkRegression(nn.Module):
         self, 
         train_data: Tuple[ArrayLike, ArrayLike],
         val_data: Optional[Tuple[ArrayLike, ArrayLike]] = None,
-        ) -> Tuple[dict, dict]:
+        n_epochs: int = 30,
+        patience: int = 5,
+        min_delta: int = 1e-5
+) -> Tuple[dict, dict]:
         '''
         Train model on provided data. Will make validation data
         automatically if not provided for early stopping.
@@ -99,6 +104,9 @@ class NeuralNetworkRegression(nn.Module):
             loss_fn,
             trn_dloader,
             val_dloader,
+            n_epochs=n_epochs,
+            patience=patience,
+            min_delta=min_delta,
             device='cuda' if torch.cuda.is_available() else 'cpu')
         self.model = model
         self.trn_loss_ls = trn_loss_ls
@@ -176,7 +184,7 @@ class SequenceRegressionLinear(nn.Module):
         self.alphabet_size   = alphabet_size
         self.sequence_length = sequence_length
         input_size = self.alphabet_size * self.sequence_length
-        self.model = nn.Linear(input_size, 1)
+        self.linear = nn.Linear(input_size, 1)
 
     def forward(self, x):
         # flatten the input [batch_size, sequence_length, alphabet_size]

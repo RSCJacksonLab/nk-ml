@@ -46,7 +46,8 @@ def main():
 
             # get data
             landscape = ProteinLandscape(
-                csv_path=f'./data/nk_landscapes/k{K}_r{rep}.csv'
+                csv_path=f'./data/nk_landscapes/k{K}_r{rep}.csv',
+                amino_acids=AA_ALPHABET
             )
             ohe = landscape.ohe
             y = landscape.fitnesses

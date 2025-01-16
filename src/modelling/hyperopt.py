@@ -360,8 +360,13 @@ def objective_fn(trial: opt.Trial,
 
 
     #train and val loaders 
-    _, val_res = model_instance.fit(train_data, val_data)
-
+    _, val_res = model_instance.fit(
+        train_data, 
+        val_data,
+        n_epochs=n_epochs,
+        patience=patience,
+        min_delta=min_delta
+    )
     return val_res
 
 
