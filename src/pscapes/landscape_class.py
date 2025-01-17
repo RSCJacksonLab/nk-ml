@@ -143,6 +143,8 @@ class ProteinLandscape():
                                          "index_col": None},
                 amino_acids: str='ACDEFGHIKLMNPQRSTVWY',
                 saved_file: Optional[str] = None,
+                calculate_graph: bool = False, 
+                calculate_ruggedness: bool = False 
                 ):
         
         if saved_file is not None:
@@ -209,17 +211,20 @@ class ProteinLandscape():
         self.max_distance = max(subsets.keys())
         self.d_data = subsets
 
-        if not graph:
-            self.graph = self.build_graph()
-        else:
+
+        if graph: 
             self.graph = graph
-        self.num_minima,self.num_maxima = self.calculate_num_extrema()
-        self.extrema_ruggedness = self.calc_extrema_ruggedness()
-        (
-            self.linear_slope,
-            self.linear_RMSE,
-            self.RS_ruggedness,
-        ) = self.rs_ruggedness()
+        elif calculate_graph: 
+            self.graph = self.build_graph()
+
+        if calculate_ruggedness: 
+            self.num_minima,self.num_maxima = self.calculate_num_extrema()
+            self.extrema_ruggedness = self.calc_extrema_ruggedness()
+            (
+                self.linear_slope,
+                self.linear_RMSE,
+                self.RS_ruggedness,
+            ) = self.rs_ruggedness()
         print(self)
 
     def seed(self):
@@ -233,10 +238,7 @@ class ProteinLandscape():
             Number of Distances : {len(self.d_data)}
             Seed Sequence       : {self.coloured_seed_string()}
                 Modified positions are shown in green
-            Number of minima : {self.num_minima}
-            Number of maxima : {self.num_maxima}
-            Normalized Extrema Ruggedness : {self.extrema_ruggedness}
-            R/S Ruggedness : {self.RS_ruggedness}
+            
         """
     
     def __repr__(self):
@@ -912,7 +914,7 @@ class ProteinLandscape():
             return working
 
 
-    def rs_ruggedness(self, log_transform=False, distance=None, split=1.0):
+    def rs_ruggedness(self, log_transform=False, distance=None, split=1.0, n_jobs=-1):
         '''
         Returns the rs based ruggedness estimate for the landscape.
 
@@ -939,7 +941,7 @@ class ProteinLandscape():
         if log_transform:
             y_train = np.log10(y_train)
 
-        lin_model = LinearRegression(n_jobs=mp.cpu_count).fit(
+        lin_model = LinearRegression(n_jobs=n_jobs).fit(
             x_train, 
             y_train
         )

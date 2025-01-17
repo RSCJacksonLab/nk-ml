@@ -300,7 +300,7 @@ def objective_fn(trial: opt.Trial,
         hidden_size = trial.suggest_categorical("hidden_size",
                                                 search_space['hidden_sizes'])
         model_instance = NeuralNetworkRegression(
-                            'lstm',
+                            'ulstm',
                             **{'input_size': alphabet_len, 
                             'hidden_size': hidden_size,
                             'num_layers': num_layers,
@@ -315,7 +315,7 @@ def objective_fn(trial: opt.Trial,
         hidden_size = trial.suggest_categorical("hidden_size",
                                                 search_space['hidden_sizes'])
         model_instance = NeuralNetworkRegression(
-                            'lstm',
+                            'blstm',
                             **{'input_size': alphabet_len, 
                             'hidden_size': hidden_size,
                             'num_layers': num_layers,
@@ -367,7 +367,7 @@ def objective_fn(trial: opt.Trial,
         patience=patience,
         min_delta=min_delta
     )
-    return val_res
+    return val_res['loss']
 
 
 def sklearn_objective_fn(trial, 

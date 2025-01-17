@@ -51,6 +51,15 @@ def read_LSTM_hparams(best_params: dict):
                   'hidden_size': hidden_size}
     return param_dict
 
+def read_linear_hparams(best_params: dict):
+    return best_params
+
+def read_RF_hparams(best_params: dict): 
+    return best_params
+
+def read_GB_hparams(best_params: dict):
+    return best_params
+
 
 def read_transformer_hparams(best_params: dict): 
     """
@@ -76,14 +85,25 @@ def get_model_hparams(model_name: str, best_params: dict):
     Given model name read Optuna best_params and make dict.
     '''
     name_to_param = {
+        'linear': read_linear_hparams, 
         'cnn': read_CNN_hparams,
         'mlp': read_MLP_hparams,
         'ulstm': read_LSTM_hparams,
         'blstm': read_LSTM_hparams,
         'transformer': read_transformer_hparams,
+        'RF': read_RF_hparams,
+        'GB': read_GB_hparams
     }
     parse_fn = name_to_param[model_name]
     param_dict = parse_fn(best_params)
+
+    if model_name not in ['linear', 'RF', 'GB']:
+        learning_rate = best_params['lr']
+        batch_size    = best_params['batch_size']
+        param_dict['lr'] = learning_rate
+        param_dict['batch_size'] = batch_size
+
+
     return param_dict
 
 

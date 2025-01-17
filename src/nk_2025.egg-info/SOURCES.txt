@@ -10,9 +10,10 @@ src/benchmarking/interpolation.py
 src/benchmarking/positional_extrapolation.py
 src/modelling/__init__.py
 src/modelling/architectures.py
+src/modelling/data_utils.py
+src/modelling/hparam_space.py
 src/modelling/hyperopt.py
 src/modelling/ml_utils.py
-src/modelling/train_utils.py
 src/nk_2025.egg-info/PKG-INFO
 src/nk_2025.egg-info/SOURCES.txt
 src/nk_2025.egg-info/dependency_links.txt
