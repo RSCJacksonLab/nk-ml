@@ -26,7 +26,7 @@ class NeuralNetworkRegression(nn.Module):
     -----------
     model_name : str
         Name of the model. Options include: `linear`, `mlp`, `cnn`,
-        `lstm`, `transformer`
+        `ulstm`, 'blstm', `transformer`
 
     **kwargs
         Key word arguments for specific model instantiation.
@@ -34,7 +34,7 @@ class NeuralNetworkRegression(nn.Module):
 
     def __init__(self,
                  model_name: Literal[
-                     'linear', 'mlp', 'cnn', 'lstm', 'transformer'
+                     'linear', 'mlp', 'cnn', 'ulstm', 'blstm', 'transformer'
                  ], 
                  **kwargs):
         super().__init__()
@@ -50,6 +50,12 @@ class NeuralNetworkRegression(nn.Module):
             hparam: value for hparam, value in kwargs.items()
             if hparam in model_kwargs.parameters
         }
+
+        if model_name == 'blstm': 
+            kwargs_filtered['bidirectional']=True
+        elif model_name == 'ulstm': 
+            kwargs_filtered['bidirectional']=False
+
         # instantiate model
         self.model = model_class(**kwargs_filtered)
 
@@ -180,7 +186,6 @@ class SequenceRegressionLinear(nn.Module):
     '''
     def __init__(self, alphabet_size: int = 5, sequence_length: int = 10):
         super(SequenceRegressionLinear, self).__init__()
-        self.model_name = 'linear'
         self.alphabet_size   = alphabet_size
         self.sequence_length = sequence_length
         input_size = self.alphabet_size * self.sequence_length
@@ -215,7 +220,6 @@ class SequenceRegressionMLP(nn.Module):
                  sequence_length: int = 10,
                  hidden_sizes: list = [128,64]):
         super(SequenceRegressionMLP, self).__init__()
-        self.model_name = 'mlp'
         self.alphabet_size = alphabet_size
         self.sequence_length = sequence_length
 
@@ -295,7 +299,6 @@ class SequenceRegressionCNN(nn.Module):
         self.pool = nn.MaxPool1d(pool_kernel_size)
         self.pool_every = pool_every
 
-        self.model_name = 'cnn'
     
         # Determine the flattened size by passing a dummy input
         with torch.no_grad():
@@ -348,9 +351,8 @@ class SequenceRegressionLSTM(nn.Module):
                  input_size: int = 20,
                  hidden_size: int = 128, 
                  num_layers: int = 2, 
-                 bidirectional: bool = True):
+                 bidirectional: bool = False):
         super(SequenceRegressionLSTM, self).__init__()
-        self.model_name = 'ulstm' if bidirectional==False else 'blstm'
 
         self.hidden_size = hidden_size
         self.num_layers = num_layers
@@ -447,7 +449,6 @@ class SequenceRegressionTransformer(nn.Module):
                  n_dim: int = 256,
                  max_seq_length: int = 10):
         super(SequenceRegressionTransformer, self).__init__()
-        self.model_name = 'transformer'
         # Embedding layer to convert ohe amino acids to dense vectors
         self.embedding = nn.Linear(input_dim, d_model)
         

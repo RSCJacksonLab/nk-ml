@@ -2,7 +2,7 @@
 Default hyperparameter search space
 '''
 
-hparam_space = {
+hparam_space_NK = {
     'linear': {'learning_rate': [0.01, 0.001, 0.0001], 
                'batch_size': [32, 64, 128, 256]},
     'mlp': {'learning_rate': [0.01, 0.001, 0.0001], 
