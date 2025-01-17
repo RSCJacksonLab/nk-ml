@@ -25,7 +25,7 @@ def main():
     AA_ALPHABET = 'ACDEFGHIKLMNPQRSTVWY'
     REPLICATES = 1 
     N_TRIALS_MULTIPLIER = 15
-    PATIENCE = 20
+    PATIENCE = 12
     MIN_DELTA = 1e-5
     N_EPOCHS = 150
 
@@ -45,7 +45,7 @@ def main():
 
     # get data
     landscape = ProteinLandscape(
-        csv_path=f'./data/experimental_datasets/G_prot_4_mut_seq_space_only.csv',
+        csv_path=f'../data/experimental_datasets/G_prot_4_mut_seq_space_only.csv',
         amino_acids=AA_ALPHABET
     )
     ohe = landscape.ohe
@@ -68,7 +68,7 @@ def main():
         print(f"Optimising model: {model_name} for GB1")
         study = opt.create_study(direction='minimize')
         if model_name in ['RF', 'GB']:
-            n_trials = 1#3 * N_TRIALS_MULTIPLIER
+            n_trials = 3 * N_TRIALS_MULTIPLIER
             # optimisation
             
             x_trn = [i.flatten().reshape(-1, 1) for i in x_trn]
@@ -88,9 +88,12 @@ def main():
             )
         else:
             device = 'cuda' if torch.cuda.is_available() else 'cpu'
-            n_trials = 1#len(model_hparams[idx]) * N_TRIALS_MULTIPLIER
+            n_trials = len(model_hparams[idx]) * N_TRIALS_MULTIPLIER
         
             # optimisation
+            
+
+            
             study.optimize(
                 lambda trial: objective_fn(
                     trial,
@@ -113,7 +116,7 @@ def main():
         
 
         output_dir = os.path.abspath(
-            "./hyperopt/results/GB1_landscape_model_hparams/")
+            "../hyperopt/results/GB1_landscape_model_hparams/")
 
         
 

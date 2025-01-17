@@ -12,7 +12,7 @@ from modelling import (
     sklearn_objective_fn
 )
 from modelling.architectures import *
-from modelling.hparam_space import hparam_space_NK
+from modelling.hparam_space import hparam_space_GB1
 from pscapes.landscape_class import ProteinLandscape
 
 
@@ -25,7 +25,7 @@ def main():
     AA_ALPHABET = 'ACDEFGHIKLMNPQRSTVWY'
     REPLICATES = 1 
     N_TRIALS_MULTIPLIER = 15
-    PATIENCE = 20
+    PATIENCE = 12
     MIN_DELTA = 1e-5
     N_EPOCHS = 150
 
@@ -37,105 +37,105 @@ def main():
     model_names, model_class = zip(*model_mapping.items())
     model_names = list(model_names)
     model_class = list(model_class)
-    model_hparams = [hparam_space_NK.get(name) for name in model_names]
+    model_hparams = [hparam_space_GB1.get(name) for name in model_names]
     
     
 
 
 
-# get data
-landscape = ProteinLandscape(
-    csv_path=f'../data/experimental_datasets/G_prot_4_mut_seq_space_only.csv',
-    amino_acids=AA_ALPHABET
-)
-ohe = landscape.ohe
-y = landscape.fitnesses
-x_trn, x_val, y_trn, y_val = train_test_split(
-    ohe,
-    y, 
-    test_size=round(len(y)*0.2),
-    random_state=0
-)
+    # get data
+    landscape = ProteinLandscape(
+        csv_path=f'../data/experimental_datasets/G_prot_4_mut_seq_space_only.csv',
+        amino_acids=AA_ALPHABET
+    )
+    ohe = landscape.ohe
+    y = landscape.fitnesses
+    x_trn, x_val, y_trn, y_val = train_test_split(
+        ohe,
+        y, 
+        test_size=round(len(y)*0.2),
+        random_state=0
+    )
 
 
-# commence study for landscape
-print(
-    f"Commencing studies for landscape GB1"
-)
+    # commence study for landscape
+    print(
+        f"Commencing studies for landscape GB1"
+    )
 
-# tune for each model
-for idx, model_name in enumerate(model_names):
-    print(f"Optimising model: {model_name} for K: {K}")
-    study = opt.create_study(direction='minimize')
-    if model_name in ['RF', 'GB']:
-        print('running sklearn')
-        n_trials = 3 * N_TRIALS_MULTIPLIER
-        # optimisation
+    # tune for each model
+    for idx, model_name in enumerate(model_names):
+        print(f"Optimising model: {model_name} for GB1")
+        study = opt.create_study(direction='minimize')
+        if model_name in ['RF', 'GB']:
+            n_trials = 3 * N_TRIALS_MULTIPLIER
+            # optimisation
+            
+            x_trn = [i.flatten().reshape(-1, 1) for i in x_trn]
+            x_trn = np.concatenate(x_trn, axis=1).T
+            x_val = [i.flatten().reshape(-1, 1) for i in x_val]
+            x_val = np.concatenate(x_val, axis=1).T
+
+            study.optimize(
+                lambda trial: sklearn_objective_fn(
+                    trial,
+                    model_name,
+                    x_train=x_trn,
+                    y_train=y_trn,
+                    x_val=x_val, 
+                    y_val=y_val),
+                n_trials=n_trials
+            )
+        else:
+            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            n_trials = len(model_hparams[idx]) * N_TRIALS_MULTIPLIER
         
-        x_trn = [i.flatten().reshape(-1, 1) for i in x_trn]
-        x_trn = np.concatenate(x_trn, axis=1).T
-        x_val = [i.flatten().reshape(-1, 1) for i in x_val]
-        x_val = np.concatenate(x_val, axis=1).T
+            # optimisation
+            
 
-        study.optimize(
-            lambda trial: sklearn_objective_fn(
-                trial,
-                model_name,
-                x_train=x_trn,
-                y_train=y_trn,
-                x_val=x_val, 
-                y_val=y_val),
-            n_trials=n_trials
-        )
-    else:
-        print('running nn')
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        n_trials = len(model_hparams[idx]) * N_TRIALS_MULTIPLIER
-    
-        # optimisation
-        study.optimize(
-            lambda trial: objective_fn(
-                trial,
-                model_name,
-                model_hparams[idx],
-                len(AA_ALPHABET),
-                SEQ_LEN,
-                (x_trn, y_trn.reshape(-1,1)),
-                (x_val, y_val.reshape(-1,1)),
-                N_EPOCHS,
-                PATIENCE,
-                MIN_DELTA,
-                device
-            ),
-            n_trials=n_trials
-        )
-        print('trials done')
-    model_hparam_dict = get_model_hparams(model_name, 
-                                         study.best_params)
-    
-    
+            
+            study.optimize(
+                lambda trial: objective_fn(
+                    trial,
+                    model_name,
+                    model_hparams[idx],
+                    len(AA_ALPHABET),
+                    SEQ_LEN,
+                    (x_trn, y_trn.reshape(-1,1)),
+                    (x_val, y_val.reshape(-1,1)),
+                    N_EPOCHS,
+                    PATIENCE,
+                    MIN_DELTA,
+                    device
+                ),
+                n_trials=n_trials
+            )
+        model_hparam_dict = get_model_hparams(model_name, 
+                                            study.best_params)
+        
+        
 
-    output_dir = os.path.abspath(
-        "../hyperopt/results/NK_landscape_model_hparams/")
+        output_dir = os.path.abspath(
+            "../hyperopt/results/GB1_landscape_model_hparams/")
 
-    
+        
 
-    output_path_yaml   = output_dir + f"/{model_name}_k{K}_r{rep}.yaml"
-    output_path_pickle = output_dir + f"/{model_name}_k{K}_r{rep}.pkl"
+        output_path_yaml   = output_dir + f"/{model_name}_GB1.yaml"
+        output_path_pickle = output_dir + f"/{model_name}_GB1.pkl"
 
-    #output best parameters to yaml
-    with open(
-        output_path_yaml,
-        "w+"
-    ) as f:
-        yaml.dump(model_hparam_dict, f)
-    
-    #output study object as pickle file
-    with open(
-        output_path_pickle,
-        "wb"
-    ) as f: 
-        pickle.dump(study, f,protocol=pickle.HIGHEST_PROTOCOL)
+        #output best parameters to yaml
+        with open(
+            output_path_yaml,
+            "w+"
+        ) as f:
+            yaml.dump(model_hparam_dict, f)
+        
+        #output study object as pickle file
+        with open(
+            output_path_pickle,
+            "wb"
+        ) as f: 
+            pickle.dump(study, f,protocol=pickle.HIGHEST_PROTOCOL)
 
                 
 
