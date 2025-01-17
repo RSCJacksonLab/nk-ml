@@ -18,17 +18,16 @@ from pscapes.landscape_class import ProteinLandscape
 
 # test hyperparam optimization
 def main():
-    print(os.getcwd())
 
     print('Initialising parameters...')
 
     SEQ_LEN = 6
     AA_ALPHABET = 'ACDEFG'
     REPLICATES = 1 
-    N_TRIALS_MULTIPLIER = 2 
+    N_TRIALS_MULTIPLIER = 15
     PATIENCE = 20
-    MIN_DELTA = 1e-6
-    N_EPOCHS = 1
+    MIN_DELTA = 1e-5
+    N_EPOCHS = 150
 
     # define hyperparameter search space 
     sklearn_mappings = {"RF": RandomForestRegressor, 
@@ -36,9 +35,9 @@ def main():
     model_mapping = {**MODEL_MAPPING, **sklearn_mappings}
 
     model_names, model_class = zip(*model_mapping.items())
-    model_names = list(model_names)[-2:-1]
-    model_class = list(model_class)[-2:-1]
-    model_hparams = [hparam_space_NK.get(name) for name in model_names][-2:-1]
+    model_names = list(model_names)
+    model_class = list(model_class)
+    model_hparams = [hparam_space_NK.get(name) for name in model_names]
     
     
 
@@ -75,7 +74,8 @@ def main():
                 print(f"Optimising model: {model_name} for K: {K}")
                 study = opt.create_study(direction='minimize')
                 if model_name in ['RF', 'GB']:
-                    n_trials = 1 #3 * N_TRIALS_MULTIPLIER
+                    print('running sklearn')
+                    n_trials = 2#3 * N_TRIALS_MULTIPLIER
                     # optimisation
                     
                     x_trn = [i.flatten().reshape(-1, 1) for i in x_trn]
@@ -94,8 +94,10 @@ def main():
                         n_trials=n_trials
                     )
                 else:
+                    print('running nn')
                     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-                    n_trials = 1 #(len(model_hparams[idx]) - 2) * N_TRIALS_MULTIPLIER
+                    n_trials = 2#len(model_hparams[idx]) * N_TRIALS_MULTIPLIER
+                
                     # optimisation
                     study.optimize(
                         lambda trial: objective_fn(
@@ -113,6 +115,7 @@ def main():
                         ),
                         n_trials=n_trials
                     )
+                    print('trials done')
                 model_hparam_dict = get_model_hparams(model_name, 
                                                      study.best_params)
                 
