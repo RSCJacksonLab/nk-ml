@@ -4,7 +4,6 @@ Neural network architectures implemented in PyTorch.
 import inspect
 import math
 import numpy as np
-from pydantic import NoneStr
 import torch
 import torch.nn as nn
 
@@ -34,7 +33,7 @@ class NeuralNetworkRegression(nn.Module):
 
     def __init__(self,
                  model_name: Literal[
-                     'linear', 'mlp', 'cnn', 'lstm', 'transformer'
+                     'linear', 'mlp', 'cnn', 'ulstm', 'blstm', 'transformer'
                  ], 
                  **kwargs):
         super().__init__()
