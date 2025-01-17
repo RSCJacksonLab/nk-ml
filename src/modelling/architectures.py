@@ -4,6 +4,7 @@ Neural network architectures implemented in PyTorch.
 import inspect
 import math
 import numpy as np
+from pydantic import NoneStr
 import torch
 import torch.nn as nn
 
@@ -31,11 +32,12 @@ class NeuralNetworkRegression(nn.Module):
         Key word arguments for specific model instantiation.
     '''
 
-    def __init__(self, 
+    def __init__(self,
                  model_name: Literal[
                      'linear', 'mlp', 'cnn', 'lstm', 'transformer'
                  ], 
                  **kwargs):
+        super().__init__()
         model_class = MODEL_MAPPING[model_name]
         
         # get model agnostic hparams
@@ -55,7 +57,10 @@ class NeuralNetworkRegression(nn.Module):
         self, 
         train_data: Tuple[ArrayLike, ArrayLike],
         val_data: Optional[Tuple[ArrayLike, ArrayLike]] = None,
-        ) -> Tuple[dict, dict]:
+        n_epochs: int = 30,
+        patience: int = 5,
+        min_delta: int = 1e-5
+) -> Tuple[dict, dict]:
         '''
         Train model on provided data. Will make validation data
         automatically if not provided for early stopping.
@@ -99,6 +104,9 @@ class NeuralNetworkRegression(nn.Module):
             loss_fn,
             trn_dloader,
             val_dloader,
+            n_epochs=n_epochs,
+            patience=patience,
+            min_delta=min_delta,
             device='cuda' if torch.cuda.is_available() else 'cpu')
         self.model = model
         self.trn_loss_ls = trn_loss_ls
@@ -158,7 +166,7 @@ class NeuralNetworkRegression(nn.Module):
             'loss': avg_loss
         }
 
-class SequenceRegressionLinear(NeuralNetworkRegression): 
+class SequenceRegressionLinear(nn.Module): 
     '''
     Linear regression with PyTorch.
 
@@ -187,7 +195,7 @@ class SequenceRegressionLinear(NeuralNetworkRegression):
         return x
 
 
-class SequenceRegressionMLP(NeuralNetworkRegression):
+class SequenceRegressionMLP(nn.Module):
     '''
     Multi-layer perceptron (MLP) in PyTorch.
 
@@ -229,7 +237,7 @@ class SequenceRegressionMLP(NeuralNetworkRegression):
         return x
     
 
-class SequenceRegressionCNN(NeuralNetworkRegression):
+class SequenceRegressionCNN(nn.Module):
     def __init__(self, 
                  input_channels: int = 20, 
                  sequence_length: int = 50, 
@@ -318,7 +326,7 @@ class SequenceRegressionCNN(NeuralNetworkRegression):
         return output
 
 
-class SequenceRegressionLSTM(NeuralNetworkRegression):
+class SequenceRegressionLSTM(nn.Module):
     '''
     LSTM for sequence regression in PyTorch.
 
@@ -384,7 +392,7 @@ class SequenceRegressionLSTM(NeuralNetworkRegression):
         return output
 
 
-class PositionalEncoding(NeuralNetworkRegression):
+class PositionalEncoding(nn.Module):
     '''Positional encoding fn for tx module.'''
     def __init__(self, d_model, max_len=10):
         super(PositionalEncoding, self).__init__()
@@ -407,7 +415,7 @@ class PositionalEncoding(NeuralNetworkRegression):
         x = x + self.pe[:x.size(0), :]
         return x
 
-class SequenceRegressionTransformer(NeuralNetworkRegression):
+class SequenceRegressionTransformer(nn.Module):
     '''
     Transformer for sequence regression.
 

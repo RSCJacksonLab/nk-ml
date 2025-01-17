@@ -12,11 +12,7 @@ from sklearn.metrics import mean_squared_error
 from torch.utils.data import DataLoader
 from typing import Any, Dict, List
 
-from modelling.architectures import(SequenceRegressionCNN, 
-                                    SequenceRegressionLinear, 
-                                    SequenceRegressionMLP, 
-                                    SequenceRegressionLSTM, 
-                                    SequenceRegressionTransformer)
+from modelling.architectures import NeuralNetworkRegression
 from modelling import make_dataset
 
 # torch.backends.nnpack.enabled = False
@@ -174,11 +170,11 @@ def get_tx_hparam_combinations(embed_dim_options: List[int],
     
     return valid_combinations
    
-def objective_fn(alphabet_len: int,
-                 sequence_len: int,
-                 trial: opt.Trial,
+def objective_fn(trial: opt.Trial,
+                 model_name: str,
                  search_space: Dict[str, Any],
-                 model: nn.Module,
+                 alphabet_len: int,
+                 sequence_len: int,
                  train_data: Any,
                  val_data: Any,
                  n_epochs: int = 30,
@@ -193,14 +189,11 @@ def objective_fn(alphabet_len: int,
 
     Parameters:
     -----------
-    alphabet_len : int
-        Number of tokens/classes allowed per site
-
-    sequence_len : int
-        Length of training data sequences. 
-
     trial (optuna.trial.Trial): 
         Optuna trial object.
+
+    model_name (str): 
+        Name of model to optimize.
 
     search_space (Dict[str, Any]): 
         Dictionary defining hyperparameters to optimize. Keys are 
@@ -210,8 +203,11 @@ def objective_fn(alphabet_len: int,
             'lr', [0.01, 0.001, 0.0001]
             ), 'sequence_length': 5}.
 
-    model (nn.Module): 
-        Model to optimize. Do NOT instantiate it (i.e., avoid model()).
+    alphabet_len : int
+        Number of tokens/classes allowed per site
+
+    sequence_len : int
+        Length of training data sequences. 
 
     train_data (Any): 
         Training data.
@@ -239,33 +235,38 @@ def objective_fn(alphabet_len: int,
     """
 
     # define search spaces based on model
-    learning_rate = trial.suggest_categorical('lr', 
-                                              search_space['learning_rate'])
+    lr = trial.suggest_categorical('lr', search_space['learning_rate'])
     batch_size = trial.suggest_categorical('batch_size',
                                            search_space['batch_size'])
-    print(model) 
-    if model==SequenceRegressionLinear:
-        print (model)
-        model_instance = model(alphabet_size=alphabet_len, 
-                               sequence_length=sequence_len)
-        
-    elif model==SequenceRegressionMLP:
+    if model_name=='linear':
+        model_instance = NeuralNetworkRegression(
+            'linear',
+            **{'alphabet_size': alphabet_len, 
+               'sequence_length': sequence_len,
+               'lr': lr,
+               'batch_size': batch_size},
+        )     
+    elif model_name=='mlp':
         n_hidden_layers = trial.suggest_int('n_hidden_layers',
                                             1,
                                             search_space['max_hidden_layers'])
         hidden_sizes = [
             int(
                 trial.suggest_categorical(
-                    "hidden{}_size".format(i), search_space['hidden_sizes_categorical']
+                    f"hidden{i}_size", search_space['hidden_sizes_categorical']
                 )
             )
             for i in range(n_hidden_layers)
         ]
-        model_instance = model(alphabet_size=alphabet_len, 
-                               sequence_length=sequence_len, 
-                               hidden_sizes=hidden_sizes)
-
-    elif model==SequenceRegressionCNN:
+        model_instance= NeuralNetworkRegression(
+            'mlp',
+            **{'alphabet_size': alphabet_len, 
+               'sequence_length': sequence_len,
+               'hidden_sizes': hidden_sizes,
+               'lr': lr,
+               'batch_size': batch_size},
+        )
+    elif model_name=='cnn':
         num_conv_layers = trial.suggest_int('num_conv_layers', 
                                             1, 
                                             search_space['max_conv_layers'])
@@ -282,30 +283,51 @@ def objective_fn(alphabet_len: int,
                                   search_space['kernel_sizes_max'], 2))
             for i in range(num_conv_layers)
         ]
-        model_instance = model(input_channels=alphabet_len,
-                               sequence_length=sequence_len,
-                               num_conv_layers=num_conv_layers,
-                               n_kernels=n_kernels,
-                               kernel_sizes=kernel_sizes)
-        
-    elif model==SequenceRegressionLSTM:
+        model_instance = NeuralNetworkRegression(
+            'cnn',
+            **{'input_channels': alphabet_len, 
+               'sequence_length': sequence_len,
+               'num_conv_layers': num_conv_layers,
+               'n_kernels': n_kernels,
+               'kernel_sizes': kernel_sizes,
+               'lr': lr,
+               'batch_size': batch_size},
+        )       
+    elif model_name=='ulstm':
         num_layers = trial.suggest_int('num_layers', 
                                        1,
                                        search_space['max_lstm_layers'])
         hidden_size = trial.suggest_categorical("hidden_size",
                                                 search_space['hidden_sizes'])
-        bidirectional  = search_space['bidirectional']               
-        model_instance = model(input_size=alphabet_len,
-                               hidden_size=hidden_size,
-                               num_layers=num_layers, 
-                               bidirectional=bidirectional)
-    
-    elif model==SequenceRegressionTransformer: 
+        model_instance = NeuralNetworkRegression(
+                            'lstm',
+                            **{'input_size': alphabet_len, 
+                            'hidden_size': hidden_size,
+                            'num_layers': num_layers,
+                            'bidirectional': False,
+                            'lr': lr,
+                            'batch_size': batch_size},
+                        ) 
+    elif model_name=='blstm':
+        num_layers = trial.suggest_int('num_layers', 
+                                       1,
+                                       search_space['max_lstm_layers'])
+        hidden_size = trial.suggest_categorical("hidden_size",
+                                                search_space['hidden_sizes'])
+        model_instance = NeuralNetworkRegression(
+                            'lstm',
+                            **{'input_size': alphabet_len, 
+                            'hidden_size': hidden_size,
+                            'num_layers': num_layers,
+                            'bidirectional': True,
+                            'lr': lr,
+                            'batch_size': batch_size},
+                        )
+    elif model_name=='transformer': 
         embed_dim_options = search_space['embed_dim_options']
         max_heads = search_space['max_heads']
         valid_combinations = get_tx_hparam_combinations(embed_dim_options,
                                                         max_heads)
-    
         d_model, nhead = trial.suggest_categorical(
             "embed_dim_num_heads", 
             valid_combinations
@@ -323,39 +345,29 @@ def objective_fn(alphabet_len: int,
             "max_seq_length",
             search_space['max_seq_lengths']
         )                   
-        model_instance = model(input_dim=alphabet_len,
-                               d_model=d_model,
-                               nhead=nhead,
-                               dim_feedforward=dim_feedforward,
-                               max_seq_length=max_seq_length)
+        model_instance = NeuralNetworkRegression(
+                            'transformer',
+                            **{'input_dim': alphabet_len, 
+                            'd_model': d_model,
+                            'nhead': nhead,
+                            'dim_feedforward': dim_feedforward,
+                            'max_seq_length': max_seq_length,
+                            'lr': lr,
+                            'batch_size': batch_size},
+        )
     else: 
         raise Exception("Model not recognised.")
-        
-    # Initialize model with the trial’s hyperparameters
-    # Loss and optimizer
-    loss_fn = nn.MSELoss()
-    optimizer = optim.Adam(model_instance.parameters(), lr=learning_rate)
 
 
     #train and val loaders 
-    train_loader = DataLoader(make_dataset(train_data), 
-                              batch_size=batch_size, 
-                              shuffle=True)
-    val_loader = DataLoader(make_dataset(val_data), 
-                            batch_size=batch_size)
-
-    #run train/val
-    val_loss = optimise_hparams(trial, 
-                                model_instance, 
-                                loss_fn, 
-                                optimizer, 
-                                train_loader, 
-                                val_loader,
-                                n_epochs=n_epochs,
-                                patience=patience,
-                                min_delta=min_delta,
-                                device=device)
-    return val_loss
+    _, val_res = model_instance.fit(
+        train_data, 
+        val_data,
+        n_epochs=n_epochs,
+        patience=patience,
+        min_delta=min_delta
+    )
+    return val_res
 
 
 def sklearn_objective_fn(trial, 

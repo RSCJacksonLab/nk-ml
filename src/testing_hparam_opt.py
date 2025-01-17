@@ -46,7 +46,8 @@ def main():
 
             # get data
             landscape = ProteinLandscape(
-                csv_path=f'../data/nk_landscapes/k{K}_r{rep}.csv'
+                csv_path=f'./data/nk_landscapes/k{K}_r{rep}.csv',
+                amino_acids=AA_ALPHABET
             )
             ohe = landscape.ohe
             y = landscape.fitnesses
@@ -88,16 +89,14 @@ def main():
                 else:
                     device = 'cuda' if torch.cuda.is_available() else 'cpu'
                     n_trials = (len(model_hparams[idx]) - 2) * N_TRIALS_MULTIPLIER
-                    # model instance
-                    model = model_class[idx]
                     # optimisation
                     study.optimize(
                         lambda trial: objective_fn(
+                            trial,
+                            model_name,
+                            model_hparams[idx],
                             len(AA_ALPHABET),
                             SEQ_LEN,
-                            trial,
-                            model_hparams[idx],
-                            model,
                             (x_trn, y_trn),
                             (x_val, y_val),
                             N_EPOCHS,
