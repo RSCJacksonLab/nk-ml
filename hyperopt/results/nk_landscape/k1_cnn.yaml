@@ -1,0 +1,7 @@
+batch_size: 32
+kernel_size_layer0: 5
+kernel_size_layer1: 3
+lr: 0.001
+n_kernels_layer0: 256
+n_kernels_layer1: 224
+num_conv_layers: 2

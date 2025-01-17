@@ -1,0 +1,5 @@
+batch_size: 32
+hidden0_size: 256
+hidden1_size: 128
+lr: 0.001
+n_hidden_layers: 2
