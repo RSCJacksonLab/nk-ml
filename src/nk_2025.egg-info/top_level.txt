@@ -1,5 +1,0 @@
-analysis
-benchmarking
-modelling
-pscapes
-utils
