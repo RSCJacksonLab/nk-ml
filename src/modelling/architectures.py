@@ -4,7 +4,6 @@ Neural network architectures implemented in PyTorch.
 import inspect
 import math
 import numpy as np
-from pydantic import NoneStr
 import torch
 import torch.nn as nn
 

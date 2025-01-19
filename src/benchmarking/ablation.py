@@ -9,12 +9,13 @@ Modification of code from https://github.com/acmater/NK_Benchmarking/
 * Deterministic ablation
 '''
 
+from tempfile import TemporaryFile
 import numpy as np
 import pickle as pkl
 
 from typing import List, Optional
 
-from src.utils.sklearn_utils import train_test_model
+from utils import make_landscape_data_dicts
 
 def ablation_testing(model_dict: dict,
                      landscape_dict: dict,
@@ -34,11 +35,11 @@ def ablation_testing(model_dict: dict,
     ----------
     model_dict : dict
         Dictionary of model architectures. Format: 
-        {sklearn.model : **kwargs}.
+        {landscape_name: {model_name : **kwargs}}.
 
     landscape_dict : dict
         Dictionary of protein landscapes. Format: 
-        {Name : [Protein_Landscape()]}.
+        {landscape_name: [datafile_name: ProteinLandscape]}
 
     split : float, default=0.8, Allowed values: 0 < split < 1
         The split point used to partition the data.
@@ -64,12 +65,11 @@ def ablation_testing(model_dict: dict,
     """
 
     complete_results = {
-        x: {key :0 for key in landscape_dict.keys()} 
+        x: {key: 0 for key in landscape_dict.keys()} 
         for x in model_dict.keys()
     }
     # Iterate over model types
-    for model_type, model_properties in model_dict.items():
-        model, kwargs = model_properties
+    for model_name, model_hparams in model_dict.items():
         
         # Iterate over each landscape
         for name in landscape_dict.keys():
@@ -127,3 +127,23 @@ def ablation_testing(model_dict: dict,
         file.close()
 
     return complete_results
+
+
+
+## debug
+from benchmarking import make_landscape_data_dicts
+
+# load yamls for hparams
+model_dir = '/Users/u5802006/Documents/GitHub_repos/nk-2025/hyperopt/results/nk_landscape/'
+data_dir = '/Users/u5802006/Documents/GitHub_repos/nk-2025/data/nk_landscapes/'
+
+model_dict, data_dict = make_landscape_data_dicts(
+    data_dir,
+    model_dir,
+    alphabet= 'ACDEFG'
+)
+
+ablation_testing(model_dict, 
+                 data_dict, 
+                 split=0.8,
+                 cross_validation=5)
