@@ -13,7 +13,8 @@ import pickle as pkl
 
 from typing import Optional
 
-from src.utils.sklearn_utils import collapse_concat, reset_params_skorch
+from benchmarking import make_landscape_data_dicts
+from modelling import architectures, collapse_concat, make_dataset
 
 
 def extrapolation(model_dict: dict,
@@ -62,15 +63,21 @@ def extrapolation(model_dict: dict,
         x: {key :0 for key in landscape_dict.keys()} 
         for x in model_dict.keys()
     }
-    for model_type, model_properties in model_dict.items():
-        model, kwargs = model_properties
-        for name in landscape_dict.keys():
-            landscape = landscape_dict[name]
+    # Iterate over model types
+    for model_name, model_hparams in model_dict.items():
+
+        # Iterate over each landscape
+        for landscape_name in landscape_dict.keys():
+
+            # Get distance data from landscape
+            landscape = landscape_dict[landscape_name]
             distances = landscape[0].d_data.keys()
+
             # Deletes zero if it listed as a distance
             distances = [d for d in distances if d] 
             results = []
 
+            # Iterate over each instance of each landscape
             for instance in landscape:
                 instance_results = np.zeros((
                     len(distances),
@@ -78,10 +85,14 @@ def extrapolation(model_dict: dict,
                     cross_validation
                 ))
 
+                # cross fold eval
                 for fold in range(cross_validation):
+                    print()
                     train_datasets = []
                     test_datasets = []
+
                     for d in distances:
+
                         x_trn, y_trn, x_tst, y_tst = instance.sklearn_data(
                             split=split,
                             distance=d,
@@ -91,6 +102,8 @@ def extrapolation(model_dict: dict,
                         test_datasets.append([x_tst, y_tst])
 
                     for j, d in enumerate(distances):
+
+                        # get raining data
                         j+=1
                         x_training = collapse_concat(
                             [x[0] for x in train_datasets[:j]]
@@ -98,9 +111,12 @@ def extrapolation(model_dict: dict,
                         y_training = collapse_concat(
                             [x[1] for x in train_datasets[:j]]
                         )
-
-                        this_model = model(**kwargs)
-                        model_class = this_model.__class__.__name__
+                        
+                        # instantiate model with determined hyperparameters
+                        loaded_model = architectures.NeuralNetworkRegression(
+                            model_name,
+                            **model_hparams
+                            )
                         if model_class == "NeuralNetRegressor":
                             this_model.fit(x_training,
                                            y_training.reshape(-1,1))

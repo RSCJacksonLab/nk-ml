@@ -3,6 +3,7 @@ import re
 import yaml
 
 from pscapes import ProteinLandscape
+from modelling.data_utils import make_dataset
 
 def make_landscape_data_dicts(
     data_dir: str,

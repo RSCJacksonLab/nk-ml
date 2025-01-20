@@ -9,13 +9,15 @@ Modification of code from https://github.com/acmater/NK_Benchmarking/
 * Deterministic ablation
 '''
 
-from tempfile import TemporaryFile
 import numpy as np
 import pickle as pkl
 
+from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
+from torch.utils.data import DataLoader
 from typing import List, Optional
 
-from utils import make_landscape_data_dicts
+from benchmarking import make_landscape_data_dicts
+from modelling import architectures, make_dataset, score_sklearn_model
 
 def ablation_testing(model_dict: dict,
                      landscape_dict: dict,
@@ -70,28 +72,26 @@ def ablation_testing(model_dict: dict,
     }
     # Iterate over model types
     for model_name, model_hparams in model_dict.items():
-        
         # Iterate over each landscape
-        for name in landscape_dict.keys():
+        for landscape_name in landscape_dict.keys():
             results = np.zeros((
-                len(landscape_dict[name]),
+                len(landscape_dict[landscape_name]),
                 len(sample_densities),
                 cross_validation
             ))
-            # Iterate over each INSTANCE of each landscape,
-            # 1 for experimental
-            for idx, instance in enumerate(landscape_dict[name]):
+            # Iterate over each instance of each landscape
+            for idx, instance in enumerate(landscape_dict[landscape_name]):
                 # cross fold eval
                 for fold in range(cross_validation):
                     print()
                     for j, density in enumerate(sample_densities):
-
-                        temp_model = model(**kwargs)
+                        # get data splits
                         x_trn, y_trn, x_tst, y_tst = instance.sklearn_data(
                             split=split,
                             shuffle=shuffle,
                             random_state=fold
                         )
+                        # remove random fraction of data from train
                         np.random.seed(0)
                         idxs = np.random.choice(
                             len(x_trn),
@@ -100,22 +100,69 @@ def ablation_testing(model_dict: dict,
                         actual_x_train = x_trn[idxs]
                         actual_y_train = y_trn[idxs]
 
-                        score = train_test_model(
-                            temp_model,
-                            actual_x_train,
-                            actual_y_train,
-                            x_tst,
-                            y_tst
-                        )
+                        if model_name not in ["gb", "rf"]:
+                            # instantiate model with determined hyperparameters
+                            loaded_model = architectures.NeuralNetworkRegression(
+                                model_name,
+                                **model_hparams
+                            )
+                                 
+                            # train model and ablated data
+                            loaded_model.fit((actual_x_train, actual_y_train))
+
+                            # score model
+                            train_dset = make_dataset(
+                                (actual_x_train, actual_y_train)
+                            )
+                            train_dloader = DataLoader(train_dset)
+                            score_train = loaded_model.score(
+                                train_dloader
+                            )
+                            test_dset = make_dataset((x_tst, y_tst))
+                            test_dloader = DataLoader(test_dset)
+                            score_test = loaded_model.score(
+                                test_dloader,
+                            )
+                            score = {
+                                'train': score_train,
+                                'test': score_test
+                            }
+                        else:
+                            if model_name == "rf":
+                                loaded_model = RandomForestRegressor(
+                                    **model_hparams
+                                )
+                            elif model_name == "gb":
+                                loaded_model = GradientBoostingRegressor(
+                                    **model_hparams
+                                )
+                            else:
+                                print(f"Model {model_name} not known.")
+                                continue
+
+                            # train model on ablated data
+                            loaded_model.fit(actual_x_train, actual_y_train)
+
+                            # get model performance
+                            score = score_sklearn_model(
+                                loaded_model,
+                                actual_x_train,
+                                actual_y_train,
+                                x_tst,
+                                y_tst
+                            )
 
                         results[idx][j][fold] = score
 
                         print(
-                            f"For sample density {density}, on {name} "
-                            f"instance {idx} {model_type} returned an "
-                            f"R-squared of {score}."
+                            f"For sample density {density}, on "
+                            f"{landscape_name} instance {idx} {model_name} "
+                            f"returned an. Score of: ."
                         )
-            complete_results[model_type][name] = results.squeeze()
+                        for metric, value in score.items():
+                            print(f"{metric}: {value}")
+
+            complete_results[model_name][landscape_name] = results.squeeze()
 
     if save:
         if not file_name:
