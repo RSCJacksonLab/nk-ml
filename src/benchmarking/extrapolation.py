@@ -11,10 +11,17 @@ Modification of code from https://github.com/acmater/NK_Benchmarking/
 import numpy as np
 import pickle as pkl
 
+from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from typing import Optional
+from torch.utils.data import DataLoader
 
 from benchmarking import make_landscape_data_dicts
-from modelling import architectures, collapse_concat, make_dataset
+from modelling import (
+    architectures, 
+    collapse_concat, 
+    make_dataset, 
+    score_sklearn_model
+)
 
 
 def extrapolation(model_dict: dict,
@@ -65,26 +72,20 @@ def extrapolation(model_dict: dict,
     }
     # Iterate over model types
     for model_name, model_hparams in model_dict.items():
-
         # Iterate over each landscape
         for landscape_name in landscape_dict.keys():
-
-            # Get distance data from landscape
-            landscape = landscape_dict[landscape_name]
-            distances = landscape[0].d_data.keys()
-
-            # Deletes zero if it listed as a distance
-            distances = [d for d in distances if d] 
-            results = []
-
             # Iterate over each instance of each landscape
-            for instance in landscape:
-                instance_results = np.zeros((
+            for idx, instance in enumerate(landscape_dict[landscape_name]):
+                # Get distance data from landscape
+                distances = instance.d_data.keys()
+                # Deletes zero if it listed as a distance
+                distances = [d for d in distances if d] 
+                results = []
+                results = np.zeros((
                     len(distances),
                     len(distances),
                     cross_validation
                 ))
-
                 # cross fold eval
                 for fold in range(cross_validation):
                     print()
@@ -92,7 +93,6 @@ def extrapolation(model_dict: dict,
                     test_datasets = []
 
                     for d in distances:
-
                         x_trn, y_trn, x_tst, y_tst = instance.sklearn_data(
                             split=split,
                             distance=d,
@@ -102,64 +102,81 @@ def extrapolation(model_dict: dict,
                         test_datasets.append([x_tst, y_tst])
 
                     for j, d in enumerate(distances):
-
-                        # get raining data
-                        j+=1
+                        # get training and testing data
+                        j += 1
                         x_training = collapse_concat(
                             [x[0] for x in train_datasets[:j]]
                         )
                         y_training = collapse_concat(
                             [x[1] for x in train_datasets[:j]]
                         )
-                        
-                        # instantiate model with determined hyperparameters
-                        loaded_model = architectures.NeuralNetworkRegression(
-                            model_name,
-                            **model_hparams
-                            )
-                        if model_class == "NeuralNetRegressor":
-                            this_model.fit(x_training,
-                                           y_training.reshape(-1,1))
-                            print(
-                                f"{model_type} trained on Dataset {name} "
-                                f"distances 1-{d}"
-                            )
-                            print()
-                            for k, test_dataset in enumerate(test_datasets):
-                                score = this_model.score(
-                                    test_dataset[0],
-                                    test_dataset[1].reshape(-1,1)
-                                )
-                                print(
-                                    f"On dataset {name}, fold {fold}, for "
-                                    f"distance {distances[k]}, {model_type} "
-                                    f"returned an R-squared of {score}"
-                                )
-                                instance_results[j-1][k][fold] = score
-                            # reset model parameters
-                            reset_params_skorch(this_model)
+                        x_testing = collapse_concat(
+                            [x[0] for x in test_datasets[:j]]
+                        )
+                        y_testing = collapse_concat(
+                            [x[1] for x in test_datasets[:j]]
+                        )
+                        if model_name not in ["gb", "rf"]:
 
+                            loaded_model = architectures.NeuralNetworkRegression(
+                                model_name,
+                                **model_hparams
+                            )
+                            # train model
+                            print(
+                                f"{model_name} trained on Dataset "
+                                f"{landscape_name} distances 1-{d}"
+                            )
+                            loaded_model.fit((x_training, y_training))
+
+                            # score model
+                            train_dset = make_dataset(
+                                (x_training, y_training)
+                            )
+                            train_dloader = DataLoader(train_dset)
+                            score_train = loaded_model.score(
+                                train_dloader
+                            )
+                            test_dset = make_dataset(
+                                (x_testing, y_testing)
+                            )
+                            test_dloader = DataLoader(test_dset)
+                            score_test = loaded_model.score(
+                                test_dloader,
+                            )
+                            score = {
+                                'train': score_train,
+                                'test': score_test
+                            }   
                         else:
-                            this_model.fit(x_training,y_training)
-                            print(
-                                f"{model_type} trained on Dataset {name} "
-                                f"distances 1-{d}"
-                            )
-                            print()
-                            for k,test_dataset in enumerate(test_datasets):
-                                score = this_model.score(test_dataset[0],
-                                                         test_dataset[1])
-                                print(f"On dataset {name}, fold {fold}, for"
-                                      f" distance {distances[k]}, "
-                                      f"{model_type} returned an R-squared "
-                                      f"of {score}",
+                            if model_name == "rf":
+                                loaded_model = RandomForestRegressor(
+                                    **model_hparams
                                 )
-                                instance_results[j-1][k][fold] = score
-                        print()
-                # Removes fold dimension if cross_validation = 1
-                results.append(instance_results.squeeze()) 
+                            elif model_name == "gb":
+                                loaded_model = GradientBoostingRegressor(
+                                    **model_hparams
+                                )
+                            else:
+                                print(f"Model {model_name} not known.")
+                                continue
 
-            complete_results[model_type][name] = np.array(results)
+                            # train model on ablated data
+                            loaded_model.fit(x_training, y_training)
+
+                            # get model performance
+                            score = score_sklearn_model(
+                                loaded_model,
+                                x_training,
+                                y_training,
+                                x_testing,
+                                y_testing
+                            )
+
+                        results[idx][j][fold] = score
+                        print()
+
+            complete_results[model_name][landscape_name] = np.array(results)
 
     if save:
         if not file_name:
