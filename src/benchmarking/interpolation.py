@@ -12,9 +12,11 @@ Modification of code from https://github.com/acmater/NK_Benchmarking/
 import numpy as np
 import pickle as pkl
 
+from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
+from torch.utils.data import DataLoader
 from typing import Optional
 
-from utils.sklearn_utils import train_test_model
+from modelling import architectures, make_dataset, score_sklearn_model
 
 def interpolation(model_dict: dict,
                   landscape_dict: dict,
@@ -32,11 +34,11 @@ def interpolation(model_dict: dict,
     -----------
     model_dict : dict
         Dictionary of model architectures. Format: 
-        {sklearn.model : **kwargs}.
+        {landscape_name: {model_name : **kwargs}}.
 
     landscape_dict : dict
         Dictionary of protein landscapes. Format: 
-        {Name : [Protein_Landscape()]}.
+        {landscape_name: [datafile_name: ProteinLandscape]}
 
     split : float, default=0.8, Allowed values: 0 < split < 1
         The split point used to partition the data.
@@ -61,33 +63,83 @@ def interpolation(model_dict: dict,
         for x in model_dict.keys()
     }
     # Iterate over model types
-    for model_type, model_properties in model_dict.items():
-        model, kwargs = model_properties
+    for model_name, model_hparams in model_dict.items():
         # iterate over each landscape
-        for name in landscape_dict.keys():
-            results = np.zeros((len(landscape_dict[name]), cross_validation))
+        for landscape_name in landscape_dict.keys():
+            results = np.zeros((len(landscape_dict[landscape_name]), cross_validation))
             # iterate over each instanve of the landscape
-            for idx, instance in enumerate(landscape_dict[name]):
+            for idx, instance in enumerate(landscape_dict[landscape_name]):
                 # cross fold evalutation
                 for fold in range(cross_validation):
                     print()
-                    temp_model = model(**kwargs)
                     x_trn, y_trn, x_tst, y_tst = instance.sklearn_data(
                         split=split,
                         random_state=fold,
                     )
-                    score = train_test_model(temp_model, 
-                                             x_trn, 
-                                             y_trn, 
-                                             x_tst, 
-                                             y_tst)
+                    if model_name not in ["gb", "rf"]:
+
+                        loaded_model = architectures.NeuralNetworkRegression(
+                            model_name,
+                            **model_hparams
+                        )
+                        # train model
+                        loaded_model.fit((x_trn, y_trn))
+
+                        # score model
+                        train_dset = make_dataset(
+                            (x_trn, y_trn)
+                        )
+                        train_dloader = DataLoader(train_dset)
+                        score_train = loaded_model.score(
+                            train_dloader
+                        )
+                        test_dset = make_dataset(
+                            (x_tst, y_tst)
+                        )
+                        test_dloader = DataLoader(test_dset)
+                        score_test = loaded_model.score(
+                            test_dloader,
+                        )
+                        score = {
+                            'train': score_train,
+                            'test': score_test
+                        }   
+                    
+                    else:
+                        if model_name == "rf":
+                            loaded_model = RandomForestRegressor(
+                                **model_hparams
+                            )
+                        elif model_name == "gb":
+                            loaded_model = GradientBoostingRegressor(
+                                **model_hparams
+                            )
+                        else:
+                            print(f"Model {model_name} not known.")
+                            continue
+
+                        # train model on ablated data
+                        loaded_model.fit(x_trn, y_trn)
+
+                        # get model performance
+                        score = score_sklearn_model(
+                            loaded_model,
+                            x_trn,
+                            y_trn,
+                            x_tst,
+                            y_tst
+                        )
+
                     print(
-                        f"{model_type} trained on Dataset {name} achieved an "
-                        f"R^2 of {score}."
+                        f"{model_name} trained on Dataset {landscape_name} "
+                        f"a score of:"
                     )
+                    for metric, value in score.items():
+                        print(f"{metric}: {value}")
+
                     results[idx][fold] = score
-            
-            complete_results[model_type][name] = results
+        
+            complete_results[model_name][landscape_name] = results
 
     if save:
         if not file_name:

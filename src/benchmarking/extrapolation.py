@@ -40,11 +40,11 @@ def extrapolation(model_dict: dict,
     ----------
     model_dict : dict
         Dictionary of model architectures. Format: 
-        {sklearn.model : **kwargs}.
+        {landscape_name: {model_name : **kwargs}}.
 
     landscape_dict : dict
         Dictionary of protein landscapes. Format: 
-        {Name : [Protein_Landscape()]}.
+        {landscape_name: [datafile_name: ProteinLandscape]}
 
     split : float, default=0.8, Allowed values: 0 < split < 1
         The split point used to partition the data.
