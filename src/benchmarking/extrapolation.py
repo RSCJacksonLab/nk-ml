@@ -70,15 +70,15 @@ def extrapolation(model_dict: dict,
         x: {key :0 for key in landscape_dict.keys()} 
         for x in model_dict.keys()
     }
-    # Iterate over model types
+    # iterate over model types
     for model_name, model_hparams in model_dict.items():
-        # Iterate over each landscape
+        # iterate over each landscape
         for landscape_name in landscape_dict.keys():
-            # Iterate over each instance of each landscape
+            # iterate over each instance of each landscape
             for idx, instance in enumerate(landscape_dict[landscape_name]):
-                # Get distance data from landscape
+                # get distance data from landscape
                 distances = instance.d_data.keys()
-                # Deletes zero if it listed as a distance
+                # deletes zero if it listed as a distance
                 distances = [d for d in distances if d] 
                 results = []
                 results = np.zeros((
@@ -123,11 +123,11 @@ def extrapolation(model_dict: dict,
                                 **model_hparams
                             )
                             # train model
+                            loaded_model.fit((x_training, y_training))
                             print(
                                 f"{model_name} trained on Dataset "
                                 f"{landscape_name} distances 1-{d}"
                             )
-                            loaded_model.fit((x_training, y_training))
 
                             # score model
                             train_dset = make_dataset(

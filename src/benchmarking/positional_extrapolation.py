@@ -10,9 +10,15 @@ Modification of code from https://github.com/acmater/NK_Benchmarking/
 import numpy as np
 import pickle as pkl
 
+from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
+from torch.utils.data import DataLoader
 from typing import Optional
 
-from src.utils.sklearn_utils import collapse_concat, reset_params_skorch
+from modelling import (
+    architectures, 
+    collapse_concat, 
+    make_dataset, 
+    score_sklearn_model)
 
 
 def positional_extrapolation(model_dict: dict,
@@ -61,14 +67,12 @@ def positional_extrapolation(model_dict: dict,
         for x in model_dict.keys()
     }
     # iterate over model types
-    for model_type, model_properties in model_dict.items():
-        model, kwargs = model_properties
+    for model_name, model_hparams in model_dict.items():
         # iterate over each landscape
-        for name in landscape_dict.keys():
-            landscape = landscape_dict[name]
+        for landscape_name in landscape_dict.keys():
             results = []
             # iterate over each instance of the landscape
-            for instance in landscape:
+            for idx, instance in enumerate(landscape_dict[landscape_name]):
                 positions = instance.mutated_positions
                 instance_results = np.zeros((
                     len(positions),
@@ -77,20 +81,20 @@ def positional_extrapolation(model_dict: dict,
                 ))
                 # cross-fold eval
                 for fold in range(cross_validation):
-
                     train_datasets = []
                     test_datasets = []
 
+                    # for each position make test/train splits
                     for pos_idx in range(positions):
-
                         x_trn, y_trn, x_tst, y_tst = instance.sklearn_data(
+                            split=split,
                             positions=positions[:pos_idx + 1]
                         )
                         train_datasets.append([x_trn, y_trn])
                         test_datasets.append([x_tst, y_tst])
 
+                    # for each test/train split - train and test models
                     for pos_idx in range(positions):
-                        
                         pos_idx += 1
                         x_training = collapse_concat(
                             [x[0] for x in train_datasets[:pos_idx]]
@@ -98,54 +102,92 @@ def positional_extrapolation(model_dict: dict,
                         y_training = collapse_concat(
                             [x[1] for x in train_datasets[:pos_idx]]
                         )
-                        this_model = model(**kwargs)
-                        model_class = this_model.__class__.__name__
-                        if model_class == "NeuralNetRegressor":
-                            this_model.fit(x_training, 
-                                           y_training.reshape(-1,1))
-                            print(
-                                f"{model_type} trained on Dataset {name} "
-                                f"positions {positions[:pos_idx]}"
-                            )
-                            print()
-                            for k, test_dataset in enumerate(test_datasets):
-                                score = this_model.score(
-                                    test_dataset[0],
-                                    test_dataset[1].reshape(-1,1)
-                                )
-                                print(
-                                    f"On dataset {name}, fold {fold}, for "
-                                    f"positions {positions[:k + 1]}, {model} "
-                                    f"returned an R-squared of {score}."
-                                )
+                        x_testing = collapse_concat(
+                            [x[0] for x in test_datasets[:pos_idx]]
+                        )
+                        y_testing = collapse_concat(
+                            [x[1] for x in test_datasets[:pos_idx]]
+                        )
+                        if model_name not in ["gb", "rf"]:
 
-                                instance_results[j-1][k][fold] = score
-                            # reset the models parameters
-                            reset_params_skorch(this_model) 
+                            loaded_model = architectures.NeuralNetworkRegression(
+                                model_name,
+                                **model_hparams
+                            )
+                            # train model
+                            loaded_model.fit(x_training, 
+                                             y_training.reshape(-1,1))
+                            print(
+                                f"{model_name} trained on Dataset "
+                                f"{landscape_name} positions"
+                                f"{positions[:pos_idx]}"
+                            )
+    
+                            # score model
+                            train_dset = make_dataset(
+                                (x_training, y_training)
+                            )
+                            train_dloader = DataLoader(train_dset)
+                            score_train = loaded_model.score(
+                                train_dloader
+                            )
+                            test_dset = make_dataset(
+                                (x_testing, y_testing)
+                            )
+                            test_dloader = DataLoader(test_dset)
+                            score_test = loaded_model.score(
+                                test_dloader,
+                            )
+                            score = {
+                                'train': score_train,
+                                'test': score_test
+                            }
 
                         else:
-                            this_model.fit(x_training, y_training)
-                            print(
-                                f"{model_type} trained on Dataset {name} "
-                                f"positions {positions[pos_idx]}."
-                            )
-                            print()
-                            for k,test_dataset in enumerate(test_datasets):
-                                score = this_model.score(test_dataset[0],
-                                                         test_dataset[1])
-                                print(
-                                    f"On dataset {name}, fold {fold}, for "
-                                    f"positions {positions[pos_idx]}, "
-                                    f"{model_type} returned an R-squared of "
-                                    f"{score}"
+                            if model_name == "rf":
+                                loaded_model = RandomForestRegressor(
+                                    **model_hparams
                                 )
-                                instance_results[pos_idx - 1][k][fold] = score
-                        print()
+                            elif model_name == "gb":
+                                loaded_model = GradientBoostingRegressor(
+                                    **model_hparams
+                                )
+                            else:
+                                print(f"Model {model_name} not known.")
+                                continue
+                        
+                        # train model on position data
+                        loaded_model.fit(x_training, y_training)
+
+                        print(
+                            f"{model_name} trained on Dataset"
+                            f" {landscape_name} positions "
+                            f"{positions[pos_idx]}."
+                        )
+
+                        # get model performance
+                        score = score_sklearn_model(
+                            loaded_model,
+                            x_training,
+                            y_training,
+                            x_testing,
+                            y_testing
+                        )
+    
+                        print(
+                            f"On dataset {landscape_name}, fold {fold}, for "
+                            f"positions {positions[pos_idx]}, "
+                            f"{model_name} returned scores of:"
+                        )
+                        for metric, value in score.items():
+                            print(f"{metric}: {value}")
+
+                        results[pos_idx - 1][fold] = score
 
                 # Remove fold dimension if cross_validation = 1
                 results.append(instance_results.squeeze())
 
-            complete_results[model_type][name] = np.array(results)
+            complete_results[model_name][landscape_name] = results
 
     if save:
         if not file_name:
