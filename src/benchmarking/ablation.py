@@ -11,12 +11,13 @@ Modification of code from https://github.com/acmater/NK_Benchmarking/
 
 import numpy as np
 import pickle as pkl
+import os
 
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from torch.utils.data import DataLoader
 from typing import List, Optional
 
-from benchmarking import make_landscape_data_dicts
+from benchmarking.file_proc import make_landscape_data_dicts
 from modelling import architectures, make_dataset, score_sklearn_model
 
 def ablation_testing(model_dict: dict,
@@ -27,7 +28,7 @@ def ablation_testing(model_dict: dict,
                      file_name: Optional[str] = None,
                      shuffle: bool = True,
                      sample_densities: List[float] = [0.9, 0.7, 0.5, 0.3, 0.1],
-                     directory: str = "Results/"):
+                     directory: str = "results/"):
     """
     Interpolation function that takes a dictionary of models and a
     landscape dictionary and iterates over all models and landscapes,
@@ -62,7 +63,7 @@ def ablation_testing(model_dict: dict,
         Split densities that are passed to the sklearn_data function of
         each landscape.
 
-    directory : str, default="Results/"
+    directory : str, default="results/"
         Directory is the directory to which the results will be saved.
     """
 
@@ -70,10 +71,25 @@ def ablation_testing(model_dict: dict,
         x: {key: 0 for key in landscape_dict.keys()} 
         for x in model_dict.keys()
     }
-    # Iterate over model types
-    for model_name, model_hparams in model_dict.items():
+    
+    first_key = list(model_dict.keys())[0]
+    model_names = list(model_dict[first_key].keys()) #get the model names 
+    print(model_names)
+
+    # Iterate over model types. 
+    # model_dict = {'k0':{'model_name':{hparams}}}
+    #for model_name, model_hparams in model_dict.items():
+    for model_name in model_names: 
+        print('Working on model: {}'.format(model_name))
+
         # Iterate over each landscape
+        # landscape_dict = {'k0':{r1: ProteinLandscape, r2: ProteinLandscape...rn:}}
         for landscape_name in landscape_dict.keys():
+            print('Working on landscape: {}'.format(landscape_name))
+
+            #extract model hparams
+            model_hparams = model_dict[landscape_name][model_name]
+
             results = np.zeros((
                 len(landscape_dict[landscape_name]),
                 len(sample_densities),
@@ -81,15 +97,23 @@ def ablation_testing(model_dict: dict,
             ))
             # Iterate over each instance of each landscape
             for idx, instance in enumerate(landscape_dict[landscape_name]):
+                print('Working on instance {} of landscape {}'.format(idx, landscape_name))
+
                 # cross fold eval
                 for fold in range(cross_validation):
-                    print()
+                    print('Working on cross-validation fold: {}'.format(fold))
+
                     for j, density in enumerate(sample_densities):
+                        print('Working on sampling density: {}'.format(density))
+                        
+                        landscape_instance = landscape_dict[landscape_name][instance]
+
                         # get data splits
-                        x_trn, y_trn, x_tst, y_tst = instance.sklearn_data(
+                        x_trn, y_trn, x_tst, y_tst = landscape_instance.sklearn_data(
                             split=split,
                             shuffle=shuffle,
-                            random_state=fold
+                            random_state=fold, 
+                            convert_to_ohe=True
                         )
                         # remove random fraction of data from train
                         np.random.seed(0)
@@ -106,11 +130,18 @@ def ablation_testing(model_dict: dict,
                                 model_name,
                                 **model_hparams
                             )
-                                 
+                            
+                            print('Loading model hparams: {}'.format(model_hparams))
+
+
                             # train model and ablated data
-                            loaded_model.fit((actual_x_train, actual_y_train))
+                            print('Fitting model')
+                            loaded_model.fit((actual_x_train, 
+                                              actual_y_train),
+                                              n_epochs=10)
 
                             # score model
+                            print('Scoring model')
                             train_dset = make_dataset(
                                 (actual_x_train, actual_y_train)
                             )
@@ -123,6 +154,7 @@ def ablation_testing(model_dict: dict,
                             score_test = loaded_model.score(
                                 test_dloader,
                             )
+
                             score = {
                                 'train': score_train,
                                 'test': score_test
@@ -141,9 +173,11 @@ def ablation_testing(model_dict: dict,
                                 continue
 
                             # train model on ablated data
+                            print('Fitting model')
                             loaded_model.fit(actual_x_train, actual_y_train)
 
                             # get model performance
+                            print('Scoring model')                            
                             score = score_sklearn_model(
                                 loaded_model,
                                 actual_x_train,
@@ -152,7 +186,9 @@ def ablation_testing(model_dict: dict,
                                 y_tst
                             )
 
-                        results[idx][j][fold] = score
+                        results[idx][j][fold] = score  # idx is landscape replicate index;
+                                                       # j is density index 
+                                                       # fold is cross-validation fold
 
                         print(
                             f"For sample density {density}, on "
@@ -177,20 +213,20 @@ def ablation_testing(model_dict: dict,
 
 
 
-## debug
-from benchmarking import make_landscape_data_dicts
 
 # load yamls for hparams
-model_dir = '/Users/u5802006/Documents/GitHub_repos/nk-2025/hyperopt/results/nk_landscape/'
-data_dir = '/Users/u5802006/Documents/GitHub_repos/nk-2025/data/nk_landscapes/'
+hopt_dir =  os.path.abspath("./hyperopt/results/nk_landscape/") # hyperparameter directory
+data_dir =  os.path.abspath("./data/nk_landscapes/") # data directory with NK landscape data
+
+
 
 model_dict, data_dict = make_landscape_data_dicts(
     data_dir,
-    model_dir,
+    hopt_dir,
     alphabet= 'ACDEFG'
 )
 
-ablation_testing(model_dict, 
-                 data_dict, 
+ablation_testing(model_dict=model_dict, 
+                 landscape_dict=data_dict, 
                  split=0.8,
                  cross_validation=5)
