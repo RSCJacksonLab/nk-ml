@@ -162,6 +162,7 @@ class NeuralNetworkRegression(nn.Module):
         # get performance metrics
         pearson_r, _ = pearsonr(all_preds.flatten(),
                                 all_targets.flatten())
+        pearson_r = pearson_r.item()
         r2 = r2_score(all_targets, all_preds)
         avg_loss = total_loss / len(dloader)
 
@@ -183,9 +184,9 @@ class SequenceRegressionLinear(nn.Module):
     sequence_length: int, default=10
         Length of the input sequence. 
     '''
-    def __init__(self, alphabet_size: int = 5, sequence_length: int = 10):
+    def __init__(self, input_dim: int = 5, sequence_length: int = 10):
         super(SequenceRegressionLinear, self).__init__()
-        self.alphabet_size   = alphabet_size
+        self.alphabet_size = input_dim
         self.sequence_length = sequence_length
         input_size = self.alphabet_size * self.sequence_length
         self.linear = nn.Linear(input_size, 1)
@@ -215,14 +216,14 @@ class SequenceRegressionMLP(nn.Module):
         List of hidden layer sizes.
     '''
     def __init__(self, 
-                 alphabet_size: int = 5,
+                 input_dim: int = 5,
                  sequence_length: int = 10,
                  hidden_sizes: list = [128,64]):
         super(SequenceRegressionMLP, self).__init__()
-        self.alphabet_size = alphabet_size
+        self.input_dim = input_dim
         self.sequence_length = sequence_length
 
-        input_size = alphabet_size * sequence_length
+        input_size = input_dim * sequence_length
         self.fc_layers = nn.ModuleList()
         for i in range(len(hidden_sizes)):
             fc_layer = nn.Linear(input_size, hidden_sizes[i])
@@ -242,7 +243,7 @@ class SequenceRegressionMLP(nn.Module):
 
 class SequenceRegressionCNN(nn.Module):
     def __init__(self, 
-                 input_channels: int = 20, 
+                 input_dim: int = 20, 
                  sequence_length: int = 50, 
                  num_conv_layers: int = 2, 
                  n_kernels: List[int] = [64, 128], 
@@ -254,7 +255,7 @@ class SequenceRegressionCNN(nn.Module):
 
         Parameters:
         -----------
-        input_channels: int, default=20
+        input_dim: int, default=20
             Number of input channels, e.g., 20 for one-hot encoded
             amino acids.
 
@@ -283,7 +284,7 @@ class SequenceRegressionCNN(nn.Module):
 
         # Create convolutional layers dynamically
         self.conv_layers = nn.ModuleList()
-        in_channels = input_channels
+        in_channels = input_dim
         
         for i in range(num_conv_layers):
             conv_layer = nn.Conv1d(in_channels=in_channels,
@@ -302,7 +303,7 @@ class SequenceRegressionCNN(nn.Module):
         # Determine the flattened size by passing a dummy input
         with torch.no_grad():
             # (batch_size, input_channels, sequence_length)
-            dummy_input = torch.randn(1, input_channels, sequence_length)
+            dummy_input = torch.randn(1, input_dim, sequence_length)
             for i, conv_layer in enumerate(self.conv_layers):
                 dummy_input = torch.relu(conv_layer(dummy_input))
                 if (i + 1) % pool_every == 0:
@@ -347,7 +348,7 @@ class SequenceRegressionLSTM(nn.Module):
         If True, make the LSTM bidirectional.
     '''
     def __init__(self, 
-                 input_size: int = 20,
+                 input_dim: int = 20,
                  hidden_size: int = 128, 
                  num_layers: int = 2, 
                  bidirectional: bool = False):
@@ -360,7 +361,7 @@ class SequenceRegressionLSTM(nn.Module):
 
         # Define the LSTM layer
         self.lstm = nn.LSTM(
-            input_size=input_size,
+            input_size=input_dim,
             hidden_size=hidden_size,
             num_layers=num_layers,
             batch_first=True,

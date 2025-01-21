@@ -19,7 +19,7 @@ from functools import partial, reduce
 from numpy.typing import ArrayLike
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
-from typing import Literal, Optional, Union
+from typing import Optional, Union
 
 from utils import aa_to_ohe, collapse_concat, token_data_to_ohe
 
@@ -254,7 +254,7 @@ class ProteinLandscape():
     
     def get_distance(self, 
                      dist: int, 
-                     return_as: Optional[Literal["tokens", "ohe"]] = None):
+                     tokenize: bool = True):
         '''
         Returns all arrays at a fixed distance from the seed string
 
@@ -269,10 +269,8 @@ class ProteinLandscape():
         '''
         assert dist in self.d_data.keys(), "Distance not found in data."
 
-        if return_as == "tokens":
+        if tokenize:
             return self.tokenized[self.d_data[dist]]
-        elif return_as == "ohe":
-            return self.ohe[self.d_data[dist]]
         else:
             return self.data[self.d_data[dist]]
 
@@ -496,7 +494,9 @@ class ProteinLandscape():
                      split: float = 0.8,
                      shuffle: bool = True,
                      random_state: Optional[int] = None,
-                     convert_to_ohe: bool = False):
+                     convert_to_ohe: bool = False,
+                     flatten_ohe: bool = False,
+                     ):
         '''
         Parameters:
         -----------
@@ -526,6 +526,10 @@ class ProteinLandscape():
             Determines if the data will be converted to one-hot encoding
             before being returned. Else, data will remain tokenized.
 
+        flatten_ohe : bool, default=False
+            If ohe, either flatten (n_seqs, seq_len * n_tokens) or keep in
+            3D (n_seqs, seq_len, n_tokens)
+
         Returns:
         --------
         x_train, y_train, x_test, y_test
@@ -534,21 +538,21 @@ class ProteinLandscape():
         '''
         assert (0 <= split <= 1), "Split must be between 0 and 1"
 
-        # determine embedding scheme
-        return_as = 'tokens'
-        if convert_to_ohe:
-            return_as = 'ohe'
-
+        # get data
         if data is not None:
             data = data
         elif distance is not None:
             if type(distance) == int:
                 data = copy.copy(self.get_distance(distance,
-                                                   return_as=return_as))
-            else:
+                                                   tokenize=True))
+            elif type(distance) == list:
                 data = collapse_concat(
-                    [copy.copy(self.get_distance(d, return_as=return_as))
+                    [copy.copy(self.get_distance(d, tokenize=True))
                      for d in distance]
+                )
+            else:
+                raise ValueError(
+                    "Provided distance must be list of ints or int"
                 )
         elif positions is not None:
             data = copy.copy(
@@ -557,6 +561,7 @@ class ProteinLandscape():
         else:
             data = copy.copy(self.tokenized)
 
+        # shuffle data prior to splitting
         if shuffle:
             # assign random state if provided
             if random_state is not None:
@@ -576,12 +581,18 @@ class ProteinLandscape():
         x_test  = test[:,:-1]
         y_test  = test[:,-1]
 
+        # ensure train data is integer type (after tokenization)
+        x_train = x_train.astype(int)
+        x_test = x_test.astype(int)
+
         # convert tokenized data if requested - makes flat ohe
         if convert_to_ohe:
-            x_train = token_data_to_ohe(x_train, self.amino_acids)
-            y_train = token_data_to_ohe(y_train, self.amino_acids)
-            x_test = token_data_to_ohe(x_test, self.amino_acids)
-            y_test = token_data_to_ohe(y_test, self.amino_acids)
+            x_train = token_data_to_ohe(x_train, 
+                                        self.amino_acids, 
+                                        flatten=flatten_ohe)
+            x_test = token_data_to_ohe(x_test, 
+                                       self.amino_acids, 
+                                       flatten=flatten_ohe)
 
         return x_train.astype("int"), y_train.astype("float"), \
                x_test.astype("int"), y_test.astype("float")

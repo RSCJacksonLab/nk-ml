@@ -80,7 +80,8 @@ def run_hparam_opt():
                             'bidirectional':True}
 
     TRANS_HPARAM_SPACE   = {'learning_rate': learning_rates, 'batch_size': batch_sizes, 
-                            'alphabet_size':ALPHABET_LEN,'embed_dim_options':[ 32, 64, 128, 256],                                       'max_heads':8, 'max_layers':2, 'feedforward_dims': [32, 64, 128, 256], 
+                            'alphabet_size':ALPHABET_LEN,'embed_dim_options':[ 32, 64, 128, 256],                                       
+                            'max_heads':8, 'max_layers':2, 'feedforward_dims': [32, 64, 128, 256], 
                             'max_seq_lengths':[6, 8, 10]}
 
 

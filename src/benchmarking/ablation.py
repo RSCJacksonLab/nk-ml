@@ -8,12 +8,14 @@ Modification of code from https://github.com/acmater/NK_Benchmarking/
 * Deterministic fold splits
 * Deterministic ablation
 '''
-
+import inspect
 import numpy as np
 import pickle as pkl
 import os
+import sys
 
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
+from sympy import sequence
 from torch.utils.data import DataLoader
 from typing import List, Optional
 
@@ -22,6 +24,8 @@ from modelling import architectures, make_dataset, score_sklearn_model
 
 def ablation_testing(model_dict: dict,
                      landscape_dict: dict,
+                     sequence_len: int,
+                     alphabet_size: int,
                      split: float = 0.8,
                      cross_validation: int = 1,
                      save: bool = True,
@@ -66,7 +70,6 @@ def ablation_testing(model_dict: dict,
     directory : str, default="results/"
         Directory is the directory to which the results will be saved.
     """
-
     complete_results = {
         x: {key: 0 for key in landscape_dict.keys()} 
         for x in model_dict.keys()
@@ -75,6 +78,9 @@ def ablation_testing(model_dict: dict,
     first_key = list(model_dict.keys())[0]
     model_names = list(model_dict[first_key].keys()) #get the model names 
     print(model_names)
+
+    # get landscape properties from landscape dict
+
 
     # Iterate over model types. 
     # model_dict = {'k0':{'model_name':{hparams}}}
@@ -90,20 +96,29 @@ def ablation_testing(model_dict: dict,
             #extract model hparams
             model_hparams = model_dict[landscape_name][model_name]
 
-            results = np.zeros((
-                len(landscape_dict[landscape_name]),
-                len(sample_densities),
-                cross_validation
-            ))
+            # add dataset properties to hparams
+            model_hparams["input_dim"] = alphabet_size
+            model_hparams["sequence_length"] = sequence_len
+
+            results = {}
             # Iterate over each instance of each landscape
             for idx, instance in enumerate(landscape_dict[landscape_name]):
+
+                if not instance in results.keys():
+                    results[instance] = {}
+
                 print('Working on instance {} of landscape {}'.format(idx, landscape_name))
 
                 # cross fold eval
                 for fold in range(cross_validation):
+                
                     print('Working on cross-validation fold: {}'.format(fold))
 
-                    for j, density in enumerate(sample_densities):
+                    for density in sample_densities:
+
+                        if not f"{density}" in results[instance].keys():
+                            results[instance][f"{density}"] = {} 
+
                         print('Working on sampling density: {}'.format(density))
                         
                         landscape_instance = landscape_dict[landscape_name][instance]
@@ -113,7 +128,8 @@ def ablation_testing(model_dict: dict,
                             split=split,
                             shuffle=shuffle,
                             random_state=fold, 
-                            convert_to_ohe=True
+                            convert_to_ohe=True,
+                            flatten_ohe=False,
                         )
                         # remove random fraction of data from train
                         np.random.seed(0)
@@ -161,17 +177,24 @@ def ablation_testing(model_dict: dict,
                             }
                         else:
                             if model_name == "rf":
-                                loaded_model = RandomForestRegressor(
-                                    **model_hparams
-                                )
+                                model_class = RandomForestRegressor
+
                             elif model_name == "gb":
-                                loaded_model = GradientBoostingRegressor(
-                                    **model_hparams
-                                )
+                                model_class = GradientBoostingRegressor
                             else:
                                 print(f"Model {model_name} not known.")
                                 continue
-
+                            
+                            # apply hyperparams
+                            model_kwargs = inspect.signature(model_class)
+                            kwargs_filtered = {
+                                hparam: value 
+                                for hparam, value in model_hparams.items()
+                                if hparam in model_kwargs.parameters
+                            }
+                            loaded_model = model_class(
+                                **kwargs_filtered
+                            )
                             # train model on ablated data
                             print('Fitting model')
                             loaded_model.fit(actual_x_train, actual_y_train)
@@ -186,19 +209,19 @@ def ablation_testing(model_dict: dict,
                                 y_tst
                             )
 
-                        results[idx][j][fold] = score  # idx is landscape replicate index;
+                        results[instance][f"{density}"][fold] = score  # instance is landscape replicate name;
                                                        # j is density index 
                                                        # fold is cross-validation fold
 
                         print(
                             f"For sample density {density}, on "
-                            f"{landscape_name} instance {idx} {model_name} "
-                            f"returned an. Score of: ."
+                            f"{landscape_name} instance {instance} "
+                            f"{model_name} returned an. Score of: "
                         )
                         for metric, value in score.items():
                             print(f"{metric}: {value}")
 
-            complete_results[model_name][landscape_name] = results.squeeze()
+            complete_results[model_name][landscape_name] = results
 
     if save:
         if not file_name:
@@ -223,10 +246,13 @@ data_dir =  os.path.abspath("./data/nk_landscapes/") # data directory with NK la
 model_dict, data_dict = make_landscape_data_dicts(
     data_dir,
     hopt_dir,
-    alphabet= 'ACDEFG'
+    alphabet='ACDEFG'
 )
 
 ablation_testing(model_dict=model_dict, 
-                 landscape_dict=data_dict, 
+                 landscape_dict=data_dict,
+                 sequence_len=6,
+                 alphabet_size=len("ACDEFG"),
                  split=0.8,
-                 cross_validation=5)
+                 cross_validation=5,
+                 )

@@ -13,21 +13,14 @@ def make_landscape_data_dicts(
     model_dir: str,
     alphabet: str = 'ACDEFGHIKLMNPQRSTVWY'):
 
-    
-
     # find yaml files in hparam dir
     hparam_set_files = os.listdir(model_dir)
     hparam_set_files = [f for f in hparam_set_files if f.endswith(".yaml")]
 
- 
-
     # find csv files in data dir
 
     data_files = os.listdir(data_dir)
-
     data_files = [f for f in data_files if f.endswith(".csv")]
-
- 
 
     # get landscape names and model names
 
@@ -37,15 +30,9 @@ def make_landscape_data_dicts(
     model_names = sorted({filename.split('_')[1].replace('.yaml', '')
 
                           for filename in hparam_set_files})
-
- 
-
     model_dict = {}
-
     data_dict = {}
-
- 
-
+    
     for landscape in landscape_names: 
 
         if not landscape in model_dict.keys():

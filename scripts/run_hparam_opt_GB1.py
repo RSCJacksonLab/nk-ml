@@ -41,7 +41,7 @@ def main():
 
     # get data
     landscape = ProteinLandscape(
-        csv_path=f'../data/experimental_datasets/G_prot_4_mut_seq_space_only.csv',
+        csv_path=f'./data/experimental_datasets/gb1.csv',
         amino_acids=AA_ALPHABET
     )
     ohe = landscape.ohe
@@ -59,6 +59,8 @@ def main():
 
     # tune for each model
     for idx, model_name in enumerate(model_names):
+        if not model_name.endswith("lstm"):
+            continue
         print(f"Optimising model: {model_name} for GB1")
         study = opt.create_study(direction='minimize')
         if model_name in ['RF', 'GB']:
