@@ -72,10 +72,8 @@ def collapse_concat(arrays, dim=0):
 
 def score_sklearn_model(
     sklearn_model,
-    x_trn: ArrayLike,
-    y_trn: ArrayLike,
-    x_tst: ArrayLike,
-    y_tst: ArrayLike,
+    x: ArrayLike,
+    y: ArrayLike,
 ):
     '''
     Given a trained Scikit Learn model, determine its
@@ -86,40 +84,24 @@ def score_sklearn_model(
     sklearn_model
         Trained SciKit learn model.
 
-    x_trn : ArrayLike
-        Training input data.
+    x : ArrayLike
+        Input data.
 
-    y_trn : ArrayLike
-        Training target data.
-
-    x_tst : ArrayLike
-        Testing input data.
-
-    y_tst : ArrayLike
-        Testing target data.
+    y : ArrayLike
+        Target data.
     '''
-    # get train predictions
-    trn_preds = sklearn_model.predict(x_trn)
-    trn_mse = mean_squared_error(y_trn, trn_preds)
-    trn_r2 = r2_score(y_trn, trn_preds)
-    trn_corr = pearsonr(y_trn, trn_preds)[0]
+    # get predictions
+    preds = sklearn_model.predict(x)
 
-    # get rest predictions
-    tst_preds = sklearn_model.predict(x_tst)
-    tst_mse = mean_squared_error(y_tst, tst_preds)
-    tst_r2 = r2_score(y_tst, tst_preds)
-    tst_corr = pearsonr(y_tst, tst_preds)[0]
+    # assess performance
+    mse = mean_squared_error(y, preds)
+    r2 = r2_score(y, preds)
+    corr = pearsonr(y, preds)[0]
+
 
     # result dict
-    score_dict = {
-        'train': {
-            'pearson_r': trn_corr,
-            'r2': trn_r2,
-            'mse': trn_mse
-        },
-        'test': {
-            'pearson_r': tst_corr,
-            'r2': tst_r2,
-            'mse': tst_mse
-        }
+    return {
+        'pearson_r': corr,
+        'r2': r2,
+        'mse': mse
     }

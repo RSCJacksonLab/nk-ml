@@ -12,7 +12,6 @@ import inspect
 import numpy as np
 import pandas as pd
 import pickle as pkl
-import os
 
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from torch.utils.data import DataLoader
@@ -20,17 +19,17 @@ from typing import List, Optional
 
 from modelling import architectures, make_dataset, score_sklearn_model
 
-def ablation_testing(model_dict: dict,
-                     landscape_dict: dict,
-                     sequence_len: int,
-                     alphabet_size: int,
-                     split: float = 0.8,
-                     cross_validation: int = 1,
-                     save: bool = True,
-                     file_name: Optional[str] = None,
-                     shuffle: bool = True,
-                     sample_densities: List[float] = [0.9, 0.7, 0.5, 0.3, 0.1],
-                     directory: str = "results/"):
+def ablation_test(model_dict: dict,
+                  landscape_dict: dict,
+                  sequence_len: int,
+                  alphabet_size: int,
+                  split: float = 0.8,
+                  cross_validation: int = 1,
+                  save: bool = True,
+                  file_name: Optional[str] = None,
+                  shuffle: bool = True,
+                  sample_densities: List[float] = [0.9, 0.7, 0.5, 0.3, 0.1],
+                  directory: str = "results/"):
     """
     Interpolation function that takes a dictionary of models and a
     landscape dictionary and iterates over all models and landscapes,
@@ -220,13 +219,20 @@ def ablation_testing(model_dict: dict,
 
                             # get model performance
                             print('Scoring model')                            
-                            score = score_sklearn_model(
+                            train_score = score_sklearn_model(
                                 loaded_model,
                                 actual_x_train,
                                 actual_y_train,
+                            )
+                            test_score = score_sklearn_model(
+                                loaded_model,
                                 x_tst,
                                 y_tst
                             )
+                            score = {
+                                "train": train_score,
+                                "test": test_score
+                            }
 
                         results[instance][f"{density}"][fold] = score  # instance is landscape replicate name;
                                                        # density is density fraction
@@ -261,19 +267,21 @@ def ablation_testing(model_dict: dict,
         for model, landscapes in complete_results.items():
             for landscape, replicates in landscapes.items():
                 for replicate, densities in replicates.items():
-                    for density_val, splits in densities.items():
-                        for data_split, metrics in splits.items():
-                            # Append a row with the relevant data
-                            rows.append({
-                                "model": model,
-                                "landscape": landscape,
-                                "replicate": replicate,
-                                "density": density_val,
-                                "data_split": data_split,
-                                "pearson_r": metrics["pearson_r"],
-                                "r2": metrics["r2"],
-                                "mse": metrics["mse"]
-                            })
+                    for density_val, cv_folds in densities.items():
+                        for cv_fold, splits in cv_folds.items():
+                            for data_split, metrics in splits.items():
+                                # Append a row with the relevant data
+                                rows.append({
+                                    "model": model,
+                                    "landscape": landscape,
+                                    "replicate": replicate,
+                                    "density": density_val,
+                                    "cv_fold": cv_fold,
+                                    "data_split": data_split,
+                                    "pearson_r": metrics.get("pearson_r", None),
+                                    "r2": metrics.get("r2", None),
+                                    "mse": metrics.get("mse", None)
+                                })
 
         # Create a DataFrame from the rows
         df = pd.DataFrame(rows)
@@ -285,6 +293,7 @@ def ablation_testing(model_dict: dict,
 
 ## debugging 
 from benchmarking.file_proc import make_landscape_data_dicts
+import os
 
 # load yamls for hparams
 hopt_dir =  os.path.abspath("./hyperopt/results/nk_landscape/") # hyperparameter directory

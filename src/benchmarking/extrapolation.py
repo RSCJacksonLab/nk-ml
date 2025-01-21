@@ -8,6 +8,7 @@ Modification of code from https://github.com/acmater/NK_Benchmarking/
 * Deterministic splits during cross-fold testing
 '''
 
+import inspect
 import numpy as np
 import pickle as pkl
 
@@ -23,15 +24,15 @@ from modelling import (
 )
 
 
-def extrapolation(model_dict: dict,
-                  landscape_dict: dict,
-                  sequence_len: int,
-                  alphabet_size: int,
-                  split: float = 0.8,
-                  cross_validation: int = 1,
-                  save: bool = True,
-                  file_name: Optional[str] = None,
-                  directory: str = "Results/"):
+def extrapolation_test(model_dict: dict,
+                       landscape_dict: dict,
+                       sequence_len: int,
+                       alphabet_size: int,
+                       split: float = 0.8,
+                       cross_validation: int = 1,
+                       save: bool = True,
+                       file_name: Optional[str] = None,
+                       directory: str = "Results/"):
     """
     Extrapolation function that takes a dictionary of models and a
     landscape dictionary and iterates over all models and landscapes,
@@ -107,12 +108,6 @@ def extrapolation(model_dict: dict,
 
                 # deletes zero if it listed as a distance
                 distances = [d for d in distances if d] 
-                results = []
-                results = np.zeros((
-                    len(distances),
-                    len(distances),
-                    cross_validation
-                ))
                 # cross fold eval
                 for fold in range(cross_validation):
 
@@ -122,6 +117,10 @@ def extrapolation(model_dict: dict,
                     test_datasets = []
 
                     for d in distances:
+
+                        if not f"{d}" in results[instance].keys():
+                            results[instance][f"{d}"] = {} 
+                            
                         x_trn, y_trn, x_tst, y_tst = instance.sklearn_data(
                             split=split,
                             distance=d,
@@ -166,28 +165,49 @@ def extrapolation(model_dict: dict,
 
                             # score on different distance test sets
                             for dist_idx, dist_dset in test_datasets:
+                                x_tst = dist_dset[0]
+                                y_tst = dist_dset[1]
                                 test_dset = make_dataset(
-                                    (x_testing, y_testing)
+                                    (x_tst, y_tst)
                                 )
                                 test_dloader = DataLoader(test_dset)
                                 score_test = loaded_model.score(
                                     test_dloader,
                                 )
-                                score[f"test_dist{}"]
+                                score[f"test_dist{distances[dist_idx]}"] = score_test
                         else:
+
+                            # flatten input data 
+                            x_training = [
+                                i.flatten().reshape(-1, 1) 
+                                for i in x_training
+                                ]
+                            x_training = np.concatenate(
+                                x_training, 
+                                axis=1
+                            ).T
+
+                            # set model class
                             if model_name == "rf":
-                                loaded_model = RandomForestRegressor(
-                                    **model_hparams
-                                )
+                                model_class = RandomForestRegressor
+
                             elif model_name == "gb":
-                                loaded_model = GradientBoostingRegressor(
-                                    **model_hparams
-                                )
+                                model_class = GradientBoostingRegressor
                             else:
                                 print(f"Model {model_name} not known.")
                                 continue
 
-                            # train model on ablated data
+                            # apply hyperparams 
+                            model_kwargs = inspect.signature(model_class)
+                            kwargs_filtered = {
+                                hparam: value 
+                                for hparam, value in model_hparams.items()
+                                if hparam in model_kwargs.parameters
+                            }
+                            loaded_model = model_class(
+                                **kwargs_filtered
+                            )
+                            # train model on data less than distance
                             loaded_model.fit(x_training, y_training)
 
                             # get model performance
@@ -195,12 +215,32 @@ def extrapolation(model_dict: dict,
                                 loaded_model,
                                 x_training,
                                 y_training,
-                                x_testing,
-                                y_testing
                             )
+                            # get model performance on data greater than distance
+                            for dist_idx, dist_dset in test_datasets:
+                                x_tst = dist_dset[0]
+                                y_tst = dist_dset[1]
 
-                        results[idx][j][fold] = score
-                        print()
+                                # flatten x_test
+                                x_tst = [
+                                    i.flatten().reshape(-1, 1) 
+                                    for i in x_tst
+                                    ]
+                                x_tst = np.concatenate(
+                                    x_tst, 
+                                    axis=1
+                                ).T  
+                                
+                                # make dataset and get performance
+                                score_test = score_sklearn_model(
+                                    loaded_model,
+                                    x_tst,
+                                    y_tst,
+                                )
+
+                                score[f"test_dist{distances[dist_idx]}"] = score_test
+
+                        results[instance][j][fold] = score
 
             complete_results[model_name][landscape_name] = np.array(results)
 
@@ -218,4 +258,25 @@ def extrapolation(model_dict: dict,
 
 
 ## debugging 
+import os
 from benchmarking import make_landscape_data_dicts
+
+# load yamls for hparams
+hopt_dir =  os.path.abspath("./hyperopt/results/nk_landscape/") # hyperparameter directory
+data_dir =  os.path.abspath("./data/nk_landscapes/") # data directory with NK landscape data
+
+
+
+model_dict, data_dict = make_landscape_data_dicts(
+    data_dir,
+    hopt_dir,
+    alphabet='ACDEFG'
+)
+
+extrapolation(model_dict=model_dict, 
+                 landscape_dict=data_dict,
+                 sequence_len=6,
+                 alphabet_size=len("ACDEFG"),
+                 split=0.8,
+                 cross_validation=5,
+                 )
