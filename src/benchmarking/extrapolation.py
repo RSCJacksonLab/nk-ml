@@ -10,6 +10,7 @@ Modification of code from https://github.com/acmater/NK_Benchmarking/
 
 import inspect
 import numpy as np
+import pandas as pd
 import pickle as pkl
 
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
@@ -118,9 +119,9 @@ def extrapolation_test(model_dict: dict,
 
                     for d in distances:
 
-                        if not f"{d}" in results[instance].keys():
-                            results[instance][f"{d}"] = {} 
-                            
+                        if not f"train distance {d}" in results[instance].keys():
+                            results[instance][f"train distance {d}"] = {} 
+
                         x_trn, y_trn, x_tst, y_tst = instance.sklearn_data(
                             split=split,
                             distance=d,
@@ -240,9 +241,9 @@ def extrapolation_test(model_dict: dict,
 
                                 score[f"test_dist{distances[dist_idx]}"] = score_test
 
-                        results[instance][j][fold] = score
+                        results[instance][f"train distance {d}"][fold] = score
 
-            complete_results[model_name][landscape_name] = np.array(results)
+            complete_results[model_name][landscape_name] = results
 
     if save:
         if not file_name:
@@ -252,6 +253,34 @@ def extrapolation_test(model_dict: dict,
         file = open(directory + file_name + ".pkl", "wb")
         pkl.dump(complete_results,file)
         file.close()
+
+        # save csv
+        # Prepare a list to hold rows for the DataFrame
+        rows = []
+
+        # Iterate through the nested dictionary structure
+        for model, landscapes in complete_results.items():
+            for landscape, replicates in landscapes.items():
+                for replicate, distances in replicates.items():
+                    for dist_val, cv_folds in distances.items():
+                        for cv_fold, splits in cv_folds.items():
+                            for data_split, metrics in splits.items():
+                                # Append a row with the relevant data
+                                rows.append({
+                                    "model": model,
+                                    "landscape": landscape,
+                                    "replicate": replicate,
+                                    "train distance": dist_val,
+                                    "cv_fold": cv_fold,
+                                    "data_split": data_split,
+                                    "pearson_r": metrics.get("pearson_r", None),
+                                    "r2": metrics.get("r2", None),
+                                    "mse": metrics.get("mse", None)
+                                })
+
+        # Create a DataFrame from the rows
+        df = pd.DataFrame(rows)
+        df.to_csv(directory + file_name + ".csv", index=False)
 
     return complete_results
 
