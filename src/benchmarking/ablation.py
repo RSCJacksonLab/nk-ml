@@ -45,6 +45,12 @@ def ablation_test(model_dict: dict,
         Dictionary of protein landscapes. Format: 
         {landscape_name: [datafile_name: ProteinLandscape]}
 
+    sequence_len : int
+        Length of sequences in landscape. 
+
+    alphabet_size : int
+        Number of AAs in the alphabet.
+
     split : float, default=0.8, Allowed values: 0 < split < 1
         The split point used to partition the data.
 

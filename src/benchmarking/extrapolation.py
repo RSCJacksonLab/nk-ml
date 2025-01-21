@@ -49,6 +49,12 @@ def extrapolation_test(model_dict: dict,
         Dictionary of protein landscapes. Format: 
         {landscape_name: [datafile_name: ProteinLandscape]}
 
+    sequence_len : int
+        Length of sequences in landscape. 
+
+    alphabet_size : int
+        Number of AAs in the alphabet.
+
     split : float, default=0.8, Allowed values: 0 < split < 1
         The split point used to partition the data.
 
@@ -212,11 +218,14 @@ def extrapolation_test(model_dict: dict,
                             loaded_model.fit(x_training, y_training)
 
                             # get model performance
-                            score = score_sklearn_model(
+                            train_score = score_sklearn_model(
                                 loaded_model,
                                 x_training,
                                 y_training,
                             )
+                            score = {
+                                'train': train_score
+                            }
                             # get model performance on data greater than distance
                             for dist_idx, dist_dset in test_datasets:
                                 x_tst = dist_dset[0]
