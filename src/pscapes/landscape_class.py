@@ -391,8 +391,6 @@ class ProteinLandscape():
             Returns an Nx2 array with the first column being x_data
             (sequences), and the second being y_data (fitnesses).
         '''
-        import os
-        print(os.getcwd())
         data = pd.read_csv(csv_file, index_col=index_col)
         protein_data = data[[x_data, y_data]].to_numpy()
         return protein_data

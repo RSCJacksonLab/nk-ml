@@ -15,7 +15,6 @@ from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from typing import Optional
 from torch.utils.data import DataLoader
 
-from benchmarking import make_landscape_data_dicts
 from modelling import (
     architectures, 
     collapse_concat, 
@@ -26,6 +25,8 @@ from modelling import (
 
 def extrapolation(model_dict: dict,
                   landscape_dict: dict,
+                  sequence_len: int,
+                  alphabet_size: int,
                   split: float = 0.8,
                   cross_validation: int = 1,
                   save: bool = True,
@@ -65,19 +66,45 @@ def extrapolation(model_dict: dict,
     directory : str, default="Results/"
         Directory is the directory to which the results will be saved.
     """
+    # get the model names 
+    first_key = list(model_dict.keys())[0]
+    model_names = list(model_dict[first_key].keys())
 
     complete_results = {
-        x: {key :0 for key in landscape_dict.keys()} 
-        for x in model_dict.keys()
+        model: {key: 0 for key in landscape_dict.keys()} 
+        for model in model_names
     }
     # iterate over model types
     for model_name, model_hparams in model_dict.items():
+        print('Working on model: {}'.format(model_name))
+
         # iterate over each landscape
         for landscape_name in landscape_dict.keys():
+            print('Working on landscape: {}'.format(landscape_name))
+
+            #extract model hparams
+            model_hparams = model_dict[landscape_name][model_name]
+
+            # add dataset properties to hparams
+            model_hparams["input_dim"] = alphabet_size
+            model_hparams["sequence_length"] = sequence_len
+
+            results = {}
+
             # iterate over each instance of each landscape
             for idx, instance in enumerate(landscape_dict[landscape_name]):
+
+                # update result dict
+                if not instance in results.keys():
+                    results[instance] = {}
+
+                print(
+                    f'Working on instance {idx} of landscape {landscape_name}'
+                )
+
                 # get distance data from landscape
                 distances = instance.d_data.keys()
+
                 # deletes zero if it listed as a distance
                 distances = [d for d in distances if d] 
                 results = []
@@ -88,7 +115,9 @@ def extrapolation(model_dict: dict,
                 ))
                 # cross fold eval
                 for fold in range(cross_validation):
-                    print()
+
+                    print('Working on cross-validation fold: {}'.format(fold))
+
                     train_datasets = []
                     test_datasets = []
 
@@ -109,12 +138,6 @@ def extrapolation(model_dict: dict,
                         )
                         y_training = collapse_concat(
                             [x[1] for x in train_datasets[:j]]
-                        )
-                        x_testing = collapse_concat(
-                            [x[0] for x in test_datasets[:j]]
-                        )
-                        y_testing = collapse_concat(
-                            [x[1] for x in test_datasets[:j]]
                         )
                         if model_name not in ["gb", "rf"]:
 
@@ -137,17 +160,20 @@ def extrapolation(model_dict: dict,
                             score_train = loaded_model.score(
                                 train_dloader
                             )
-                            test_dset = make_dataset(
-                                (x_testing, y_testing)
-                            )
-                            test_dloader = DataLoader(test_dset)
-                            score_test = loaded_model.score(
-                                test_dloader,
-                            )
-                            score = {
-                                'train': score_train,
-                                'test': score_test
-                            }   
+
+                            score = {}
+                            score["train"] = score_train
+
+                            # score on different distance test sets
+                            for dist_idx, dist_dset in test_datasets:
+                                test_dset = make_dataset(
+                                    (x_testing, y_testing)
+                                )
+                                test_dloader = DataLoader(test_dset)
+                                score_test = loaded_model.score(
+                                    test_dloader,
+                                )
+                                score[f"test_dist{}"]
                         else:
                             if model_name == "rf":
                                 loaded_model = RandomForestRegressor(
@@ -188,3 +214,8 @@ def extrapolation(model_dict: dict,
         file.close()
 
     return complete_results
+
+
+
+## debugging 
+from benchmarking import make_landscape_data_dicts

@@ -10,16 +10,14 @@ Modification of code from https://github.com/acmater/NK_Benchmarking/
 '''
 import inspect
 import numpy as np
+import pandas as pd
 import pickle as pkl
 import os
-import sys
 
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
-from sympy import sequence
 from torch.utils.data import DataLoader
 from typing import List, Optional
 
-from benchmarking.file_proc import make_landscape_data_dicts
 from modelling import architectures, make_dataset, score_sklearn_model
 
 def ablation_testing(model_dict: dict,
@@ -70,17 +68,15 @@ def ablation_testing(model_dict: dict,
     directory : str, default="results/"
         Directory is the directory to which the results will be saved.
     """
-    complete_results = {
-        x: {key: 0 for key in landscape_dict.keys()} 
-        for x in model_dict.keys()
-    }
-    
+
+    # get the model names 
     first_key = list(model_dict.keys())[0]
-    model_names = list(model_dict[first_key].keys()) #get the model names 
-    print(model_names)
+    model_names = list(model_dict[first_key].keys())
 
-    # get landscape properties from landscape dict
-
+    complete_results = {
+        model: {key: 0 for key in landscape_dict.keys()} 
+        for model in model_names
+    }
 
     # Iterate over model types. 
     # model_dict = {'k0':{'model_name':{hparams}}}
@@ -101,17 +97,20 @@ def ablation_testing(model_dict: dict,
             model_hparams["sequence_length"] = sequence_len
 
             results = {}
+
             # Iterate over each instance of each landscape
             for idx, instance in enumerate(landscape_dict[landscape_name]):
 
+                # update result dict
                 if not instance in results.keys():
                     results[instance] = {}
 
-                print('Working on instance {} of landscape {}'.format(idx, landscape_name))
+                print(
+                    f'Working on instance {idx} of landscape {landscape_name}'
+                )
 
                 # cross fold eval
                 for fold in range(cross_validation):
-                
                     print('Working on cross-validation fold: {}'.format(fold))
 
                     for density in sample_densities:
@@ -154,7 +153,7 @@ def ablation_testing(model_dict: dict,
                             print('Fitting model')
                             loaded_model.fit((actual_x_train, 
                                               actual_y_train),
-                                              n_epochs=10)
+                                              n_epochs=30)
 
                             # score model
                             print('Scoring model')
@@ -176,6 +175,26 @@ def ablation_testing(model_dict: dict,
                                 'test': score_test
                             }
                         else:
+                            # flatten input data
+                            actual_x_train = [
+                                i.flatten().reshape(-1, 1) 
+                                for i in actual_x_train
+                                ]
+                            actual_x_train = np.concatenate(
+                                actual_x_train, 
+                                axis=1
+                            ).T
+
+                            x_tst = [
+                                i.flatten().reshape(-1, 1) 
+                                for i in x_tst
+                                ]
+                            x_tst = np.concatenate(
+                                x_tst, 
+                                axis=1
+                            ).T
+
+                            # set model class
                             if model_name == "rf":
                                 model_class = RandomForestRegressor
 
@@ -210,7 +229,7 @@ def ablation_testing(model_dict: dict,
                             )
 
                         results[instance][f"{density}"][fold] = score  # instance is landscape replicate name;
-                                                       # j is density index 
+                                                       # density is density fraction
                                                        # fold is cross-validation fold
 
                         print(
@@ -224,6 +243,8 @@ def ablation_testing(model_dict: dict,
             complete_results[model_name][landscape_name] = results
 
     if save:
+
+        # save as pickle
         if not file_name:
             file_name = input(
                 "What name would you like to save results with?"
@@ -231,11 +252,39 @@ def ablation_testing(model_dict: dict,
         file = open(directory + file_name + ".pkl", "wb")
         pkl.dump(complete_results, file)
         file.close()
+        
+        # save csv
+        # Prepare a list to hold rows for the DataFrame
+        rows = []
+
+        # Iterate through the nested dictionary structure
+        for model, landscapes in complete_results.items():
+            for landscape, replicates in landscapes.items():
+                for replicate, densities in replicates.items():
+                    for density_val, splits in densities.items():
+                        for data_split, metrics in splits.items():
+                            # Append a row with the relevant data
+                            rows.append({
+                                "model": model,
+                                "landscape": landscape,
+                                "replicate": replicate,
+                                "density": density_val,
+                                "data_split": data_split,
+                                "pearson_r": metrics["pearson_r"],
+                                "r2": metrics["r2"],
+                                "mse": metrics["mse"]
+                            })
+
+        # Create a DataFrame from the rows
+        df = pd.DataFrame(rows)
+        df.to_csv(directory + file_name + ".csv", index=False)
 
     return complete_results
 
 
 
+## debugging 
+from benchmarking.file_proc import make_landscape_data_dicts
 
 # load yamls for hparams
 hopt_dir =  os.path.abspath("./hyperopt/results/nk_landscape/") # hyperparameter directory
