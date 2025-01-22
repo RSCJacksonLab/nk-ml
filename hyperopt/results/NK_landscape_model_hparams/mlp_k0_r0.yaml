@@ -1,6 +1,0 @@
-batch_size: 128
-hidden_sizes:
-- 32
-- 32
-- 128
-lr: 0.0001

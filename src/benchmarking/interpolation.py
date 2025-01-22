@@ -11,6 +11,7 @@ Modification of code from https://github.com/acmater/NK_Benchmarking/
 
 import inspect
 import numpy as np
+import pandas as pd
 import pickle as pkl
 
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
@@ -19,15 +20,15 @@ from typing import Optional
 
 from modelling import architectures, make_dataset, score_sklearn_model
 
-def interpolation(model_dict: dict,
-                  landscape_dict: dict,
-                  sequence_len: int,
-                  alphabet_size: int,
-                  split: float = 0.8,
-                  cross_validation: int = 1,
-                  save: bool = True,
-                  file_name: Optional[str] = None,
-                  directory: str = "Results/"):
+def interpolation_test(model_dict: dict,
+                      landscape_dict: dict,
+                      sequence_len: int,
+                      alphabet_size: int,
+                      split: float = 0.8,
+                      cross_validation: int = 1,
+                      save: bool = True,
+                      file_name: Optional[str] = None,
+                      directory: str = "Results/"):
     """
     Interpolation function that takes a dictionary of models and a
     landscape dictionary and iterates over all models and landscapes,
@@ -97,6 +98,8 @@ def interpolation(model_dict: dict,
                 if not instance in results.keys():
                     results[instance] = {}
 
+                landscape_instance = landscape_dict[landscape_name][instance]
+
                 print(
                     f'Working on instance {idx} of landscape {landscape_name}'
                 )
@@ -106,7 +109,7 @@ def interpolation(model_dict: dict,
 
                     print('Working on cross-validation fold: {}'.format(fold))
 
-                    x_trn, y_trn, x_tst, y_tst = instance.sklearn_data(
+                    x_trn, y_trn, x_tst, y_tst = landscape_instance.sklearn_data(
                         split=split,
                         shuffle=True,
                         random_state=fold,
@@ -202,7 +205,7 @@ def interpolation(model_dict: dict,
                             "train": train_score,
                             "test": test_score
                         }
-                    results[idx][fold] = score
+                    results[instance][fold] = score
         
             complete_results[model_name][landscape_name] = results
 
@@ -243,3 +246,29 @@ def interpolation(model_dict: dict,
 
 
     return complete_results
+
+
+
+# ## debugging 
+# import os
+# from benchmarking.file_proc import make_landscape_data_dicts
+
+# # load yamls for hparams
+# hopt_dir =  os.path.abspath("./hyperopt/results/nk_landscape/") # hyperparameter directory
+# data_dir =  os.path.abspath("./data/nk_landscapes/") # data directory with NK landscape data
+
+
+
+# model_dict, data_dict = make_landscape_data_dicts(
+#     data_dir,
+#     hopt_dir,
+#     alphabet='ACDEFG'
+# )
+
+# interpolation_test(model_dict=model_dict, 
+#                  landscape_dict=data_dict,
+#                  sequence_len=6,
+#                  alphabet_size=len("ACDEFG"),
+#                  split=0.8,
+#                  cross_validation=5,
+#                  )

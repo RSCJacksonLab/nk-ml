@@ -4,8 +4,6 @@ import yaml
 
 from pscapes import ProteinLandscape
 
-from modelling.data_utils import make_dataset
-
  
 
 def make_landscape_data_dicts(
@@ -68,20 +66,14 @@ def make_landscape_data_dicts(
 
         for model in model_names:
 
-            #exclude transformer due to yaml formatting error
-            if model == 'transformer': 
-                print('Model: transformer not processed due to yaml formatting issue to be fixed')
-                hparam_set = None
-            else: 
-
-                # parse hyperparameter data
-                if f"{landscape}_{model}.yaml" in hparam_set_files:
-                    with open(model_dir + f"/{landscape}_{model}.yaml", "r") as f:                    
-                        hparam_set = yaml.safe_load(f)
-                else:
-                    print("Could not load expected hyperparameter set for "
-                        f"{model} on {landscape}.")
-                    continue
+            # parse hyperparameter data
+            if f"{landscape}_{model}.yaml" in hparam_set_files:
+                with open(model_dir + f"/{landscape}_{model}.yaml", "r") as f:                    
+                    hparam_set = yaml.safe_load(f)
+            else:
+                print("Could not load expected hyperparameter set for "
+                    f"{model} on {landscape}.")
+                continue
 
  
 

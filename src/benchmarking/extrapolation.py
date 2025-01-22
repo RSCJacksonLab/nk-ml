@@ -83,7 +83,7 @@ def extrapolation_test(model_dict: dict,
         for model in model_names
     }
     # iterate over model types
-    for model_name, model_hparams in model_dict.items():
+    for model_name in model_names:
         print('Working on model: {}'.format(model_name))
 
         # iterate over each landscape
@@ -111,7 +111,8 @@ def extrapolation_test(model_dict: dict,
                 )
 
                 # get distance data from landscape
-                distances = instance.d_data.keys()
+                landscape_instance = landscape_dict[landscape_name][instance]
+                distances = landscape_instance.d_data.keys()
 
                 # deletes zero if it listed as a distance
                 distances = [d for d in distances if d] 
@@ -128,7 +129,7 @@ def extrapolation_test(model_dict: dict,
                         if not f"train distance {d}" in results[instance].keys():
                             results[instance][f"train distance {d}"] = {} 
 
-                        x_trn, y_trn, x_tst, y_tst = instance.sklearn_data(
+                        x_trn, y_trn, x_tst, y_tst = landscape_instance.sklearn_data(
                             split=split,
                             distance=d,
                             random_state=fold,
@@ -295,26 +296,26 @@ def extrapolation_test(model_dict: dict,
 
 
 
-## debugging 
-import os
-from benchmarking import make_landscape_data_dicts
+# ## debugging 
+# import os
+# from benchmarking.file_proc import make_landscape_data_dicts
 
-# load yamls for hparams
-hopt_dir =  os.path.abspath("./hyperopt/results/nk_landscape/") # hyperparameter directory
-data_dir =  os.path.abspath("./data/nk_landscapes/") # data directory with NK landscape data
+# # load yamls for hparams
+# hopt_dir =  os.path.abspath("./hyperopt/results/nk_landscape/") # hyperparameter directory
+# data_dir =  os.path.abspath("./data/nk_landscapes/") # data directory with NK landscape data
 
 
 
-model_dict, data_dict = make_landscape_data_dicts(
-    data_dir,
-    hopt_dir,
-    alphabet='ACDEFG'
-)
+# model_dict, data_dict = make_landscape_data_dicts(
+#     data_dir,
+#     hopt_dir,
+#     alphabet='ACDEFG'
+# )
 
-extrapolation(model_dict=model_dict, 
-                 landscape_dict=data_dict,
-                 sequence_len=6,
-                 alphabet_size=len("ACDEFG"),
-                 split=0.8,
-                 cross_validation=5,
-                 )
+# extrapolation_test(model_dict=model_dict, 
+#                  landscape_dict=data_dict,
+#                  sequence_len=6,
+#                  alphabet_size=len("ACDEFG"),
+#                  split=0.8,
+#                  cross_validation=5,
+#                  )

@@ -1,4 +1,0 @@
-batch_size: 256
-hidden_size: 512
-lr: 0.001
-num_layers: 1

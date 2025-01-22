@@ -9,6 +9,7 @@ Modification of code from https://github.com/acmater/NK_Benchmarking/
 
 import inspect
 import numpy as np
+import pandas as pd
 import pickle as pkl
 
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
@@ -22,15 +23,15 @@ from modelling import (
     score_sklearn_model)
 
 
-def positional_extrapolation(model_dict: dict,
-                             landscape_dict: dict,
-                             sequence_len: int,
-                             alphabet_size: int,
-                             split: float = 0.8,
-                             cross_validation: int = 1,
-                             save: bool = True,
-                             file_name: Optional[str] = None,
-                             directory: str = "Results/"):
+def positional_extrapolation_test(model_dict: dict,
+                                  landscape_dict: dict,
+                                  sequence_len: int,
+                                  alphabet_size: int,
+                                  split: float = 0.8,
+                                  cross_validation: int = 1,
+                                  save: bool = True,
+                                  file_name: Optional[str] = None,
+                                  directory: str = "Results/"):
     """
     Interpolation function that takes a dictionary of models and a
     landscape dictionary and iterates over all models and landscapes,
@@ -98,11 +99,14 @@ def positional_extrapolation(model_dict: dict,
 
             # iterate over each instance of the landscape
             for idx, instance in enumerate(landscape_dict[landscape_name]):
-                positions = instance.mutated_positions
                 
                 # update result dict
                 if not instance in results.keys():
                     results[instance] = {}
+
+                landscape_instance = landscape_dict[landscape_name][instance]
+
+                positions = landscape_instance.mutated_positions
 
                 print(
                     f'Working on instance {idx} of landscape {landscape_name}'
@@ -115,15 +119,17 @@ def positional_extrapolation(model_dict: dict,
                     test_datasets = []
 
                     # for each position make test/train splits
-                    for pos_idx in range(positions):
+                    for pos_idx in range(len(positions)):
+
+                        actual_pos = int(positions[pos_idx])
 
                         if not pos_idx in results[instance].keys():
-                            results[instance][pos_idx] = {}
+                            results[instance][actual_pos] = {}
 
-                        if not fold in results[instance][pos_idx].keys():
-                            results[instance][pos_idx][fold] = {}
+                        if not fold in results[instance][actual_pos].keys():
+                            results[instance][actual_pos][fold] = {}
 
-                        x_trn, y_trn, x_tst, y_tst = instance.sklearn_data(
+                        x_trn, y_trn, x_tst, y_tst = landscape_instance.sklearn_data(
                             split=split,
                             positions=positions[:pos_idx + 1]
                         )
@@ -131,8 +137,11 @@ def positional_extrapolation(model_dict: dict,
                         test_datasets.append([x_tst, y_tst])
 
                     # for each test/train split - train and test models
-                    for pos_idx in range(positions):
+                    for pos_idx in range(len(positions)):
+
+                        actual_pos = int(positions[pos_idx])
                         pos_idx += 1
+
                         x_training = collapse_concat(
                             [x[0] for x in train_datasets[:pos_idx]]
                         )
@@ -253,7 +262,7 @@ def positional_extrapolation(model_dict: dict,
 
                                 score[f"test_pos{positions[pos_idx]}"] = score_test
 
-                        results[instance][pos_idx][fold] = score
+                        results[instance][actual_pos][fold] = score
 
             complete_results[model_name][landscape_name] = results
 
@@ -266,4 +275,58 @@ def positional_extrapolation(model_dict: dict,
         pkl.dump(complete_results,file)
         file.close()
 
+# save csv
+        # Prepare a list to hold rows for the DataFrame
+        rows = []
+
+        # Iterate through the nested dictionary structure
+        for model, landscapes in complete_results.items():
+            for landscape, replicates in landscapes.items():
+                for replicate, positions in replicates.items():
+                    for pos, cv_folds in positions.items():
+                        for cv_fold, splits in cv_folds.items():
+                            for data_split, metrics in splits.items():
+                                # Append a row with the relevant data
+                                rows.append({
+                                    "model": model,
+                                    "landscape": landscape,
+                                    "replicate": replicate,
+                                    "train position": pos,
+                                    "cv_fold": cv_fold,
+                                    "data_split": data_split,
+                                    "pearson_r": metrics.get("pearson_r", None),
+                                    "r2": metrics.get("r2", None),
+                                    "mse": metrics.get("mse", None)
+                                })
+
+        # Create a DataFrame from the rows
+        df = pd.DataFrame(rows)
+        df.to_csv(directory + file_name + ".csv", index=False)
+
     return complete_results
+
+
+
+# ## debugging 
+# import os
+# from benchmarking.file_proc import make_landscape_data_dicts
+
+# # load yamls for hparams
+# hopt_dir =  os.path.abspath("./hyperopt/results/nk_landscape/") # hyperparameter directory
+# data_dir =  os.path.abspath("./data/nk_landscapes/") # data directory with NK landscape data
+
+
+
+# model_dict, data_dict = make_landscape_data_dicts(
+#     data_dir,
+#     hopt_dir,
+#     alphabet='ACDEFG'
+# )
+
+# positional_extrapolation_test(model_dict=model_dict, 
+#                  landscape_dict=data_dict,
+#                  sequence_len=6,
+#                  alphabet_size=len("ACDEFG"),
+#                  split=0.8,
+#                  cross_validation=5,
+#                  )

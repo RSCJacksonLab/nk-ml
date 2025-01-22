@@ -1,8 +1,0 @@
-batch_size: 64
-dim_feedforward: 64
-embed_dim_num_heads: !!python/tuple
-- 128
-- 8
-lr: 0.001
-max_seq_length: 10
-num_layers: 1

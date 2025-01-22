@@ -1,9 +1,0 @@
-batch_size: 256
-kernel_sizes:
-- 3
-- 3
-lr: 0.001
-n_kernels:
-- 288
-- 384
-num_conv_layers: 2

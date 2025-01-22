@@ -145,6 +145,7 @@ def ablation_test(model_dict: dict,
                         actual_y_train = y_trn[idxs]
 
                         if model_name not in ["gb", "rf"]:
+
                             # instantiate model with determined hyperparameters
                             loaded_model = architectures.NeuralNetworkRegression(
                                 model_name,
@@ -180,6 +181,7 @@ def ablation_test(model_dict: dict,
                                 'test': score_test
                             }
                         else:
+
                             # flatten input data
                             actual_x_train = [
                                 i.flatten().reshape(-1, 1) 
@@ -297,26 +299,26 @@ def ablation_test(model_dict: dict,
 
 
 
-## debugging 
-from benchmarking.file_proc import make_landscape_data_dicts
-import os
+# ## debugging 
+# from benchmarking.file_proc import make_landscape_data_dicts
+# import os
 
-# load yamls for hparams
-hopt_dir =  os.path.abspath("./hyperopt/results/nk_landscape/") # hyperparameter directory
-data_dir =  os.path.abspath("./data/nk_landscapes/") # data directory with NK landscape data
+# # load yamls for hparams
+# hopt_dir =  os.path.abspath("./hyperopt/results/nk_landscape/") # hyperparameter directory
+# data_dir =  os.path.abspath("./data/nk_landscapes/") # data directory with NK landscape data
 
 
 
-model_dict, data_dict = make_landscape_data_dicts(
-    data_dir,
-    hopt_dir,
-    alphabet='ACDEFG'
-)
+# model_dict, data_dict = make_landscape_data_dicts(
+#     data_dir,
+#     hopt_dir,
+#     alphabet='ACDEFG'
+# )
 
-ablation_testing(model_dict=model_dict, 
-                 landscape_dict=data_dict,
-                 sequence_len=6,
-                 alphabet_size=len("ACDEFG"),
-                 split=0.8,
-                 cross_validation=5,
-                 )
+# ablation_test(model_dict=model_dict, 
+#                  landscape_dict=data_dict,
+#                  sequence_len=6,
+#                  alphabet_size=len("ACDEFG"),
+#                  split=0.8,
+#                  cross_validation=5,
+#                  )
