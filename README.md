@@ -21,7 +21,7 @@ After downloading this repository, please create a Python 3.10.12 virtual enviro
 And then install using `setup.py`: 
 
 `pip install -r requirements.txt`\
-`pip install ./setup.py`
+`pip install .`
 
 Estimated install time: 
 
