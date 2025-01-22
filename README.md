@@ -21,7 +21,7 @@ After downloading this repository, please create a Python 3.10.12 virtual enviro
 And then install using `setup.py`: 
 
 `pip install -r requirements.txt`\
-`pip install .`
+`pip install ./setup.py`
 
 Estimated install time: 
 
@@ -57,11 +57,11 @@ The package source code directory. Root directory of the project.
 
 #### `benchmarking`
 Subdirectory implementing experiments i.e. training and testing across 4 metrics. 
-1. `ablation.py`: script for running ablation experiments 
-2. `extrapolation.py`: script for running extrapolation experiments 
-3. `file_proc.py`: function definitions for collecting hyperparameter sets and datasets into structure amenable for experiment scripts. 
-4. `interpolation.py`: script for running interpolation experiments 
-5. `positional_extrapolation.py`: script for running positional extrapolation experiments
+1. `ablation.py`: functions for running ablation experiments 
+2. `extrapolation.py`: functions for running extrapolation experiments 
+3. `file_proc.py`: functions for collecting hyperparameter sets and datasets into structure amenable for experiment function definitionss. 
+4. `interpolation.py`: functions for running interpolation experiments 
+5. `positional_extrapolation.py`: functions for running positional extrapolation experiments
 
 #### `modelling`
 Subdirectory containing files for ML archicture definition, data processing and training. 
