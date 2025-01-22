@@ -14,14 +14,14 @@ All scripts were run using Python 3.10.12 and packages listed in requirements.tx
 After downloading this repository, please create a Python 3.10.12 virtual environment: 
 
 `cd /path/to/nk-2025` \
-`python -m venv venv` \
+`python -m venv venv` 
 
 
 
 And then install using `setup.py`: 
 
 `pip install -r requirements.txt`\
-`pip install ./setup.py`\
+`pip install ./setup.py`
 
 Estimated install time: 
 
