@@ -1,6 +1,7 @@
 import os
 import re
 import yaml
+import random
 
 from pscapes import ProteinLandscape
 
@@ -89,3 +90,36 @@ def make_landscape_data_dicts(
    
 
     return model_dict, data_dict
+
+
+
+def sub_dict(data_dict: dict,
+             n_replicates: int = 4, 
+             random_seed: int = 1):
+    
+    """ Utility function for subsampling replicates from data_dict.
+        Useful for reducing the number of replicates fed into experimental scripts. 
+    """
+    random.seed(random_seed)
+
+    landscape_keys = list(data_dict.keys())
+    replicate_keys = list(data_dict[landscape_keys[0]])
+    selection = random.sample(replicate_keys, n_replicates)
+
+    out_dict = {i:{} for i in landscape_keys}
+
+    for landscape in landscape_keys: 
+        for replicate in selection: 
+            out_dict[landscape][replicate] = data_dict[landscape][replicate]
+    
+    return out_dict
+
+
+
+
+
+    
+
+    
+
+     

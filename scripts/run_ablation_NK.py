@@ -5,7 +5,7 @@ from benchmarking.extrapolation import extrapolation_test
 from benchmarking.positional_extrapolation import positional_extrapolation_test
 from benchmarking.interpolation import interpolation_test
 
-from benchmarking.file_proc import make_landscape_data_dicts
+from benchmarking.file_proc import make_landscape_data_dicts, sub_dict
 
 import time
 import random
@@ -25,19 +25,22 @@ def main():
     
     
 
-    data_dict_repl = dict(random.sample(list(data_dict.items()), N_REPLICATES))
+    small_dict = sub_dict(data_dict, 
+                          n_replicates=N_REPLICATES)
 
-    print(data_dict_repl)
+
+    print(small_dict)
+
     print('Training and testing models.')
 
     t1 = time.time()
-    """
     ablation_results = ablation_test(model_dict=model_dict, 
                                     landscape_dict=data_dict, 
                                     sequence_len=6, 
                                     alphabet_size=len(ALPHABET), 
-                                    file_name='ablation_results',
-                                    n_epochs=1, 
+                                    file_name='ablation_results_NK',
+                                    directory= '../results/'
+                                    n_epochs=100, 
                                     patience=10,
                                     min_delta=1e-5
                                     )
@@ -45,7 +48,7 @@ def main():
     
     with open('ablation_time.log', 'w') as file: 
         file.write("Time taken: {}".format(t2-t1))       
-    """  
+
 
 if __name__ == "__main__": 
     main()
