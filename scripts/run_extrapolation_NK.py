@@ -1,6 +1,6 @@
 import numpy as np
 
-from benchmarking.ablation import ablation_test
+from benchmarking.extrapolation import extrapolation_test
 
 from benchmarking.file_proc import make_landscape_data_dicts, sub_dict
 
@@ -12,7 +12,7 @@ random.seed(10)
 
 ALPHABET = 'ACDEFG'
 SEQ_LEN  = 6
-N_REPLICATES = 1 
+N_REPLICATES = 1
 N_EPOCHS = 1
 PATIENCE = 10
 MIN_DELTA = 1e-5
