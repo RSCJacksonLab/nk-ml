@@ -16,6 +16,7 @@ from typing import List, Literal, Optional, Tuple
 from modelling.data_utils import make_dataset
 from modelling.ml_utils import train_model
 
+import time
 
 class NeuralNetworkRegression(nn.Module):
     '''
@@ -117,15 +118,16 @@ class NeuralNetworkRegression(nn.Module):
         self.trn_loss_ls = trn_loss_ls
         self.val_loss_ls = val_loss_ls
 
-        # get full scoring for train and validation data
-        train_res = self.score(trn_dloader)
-        val_res = self.score(val_dloader)
+        # get full scoring for train and validation data -- commented out for efficiency
+        #train_res = self.score(trn_dloader)
+        #val_res = self.score(val_dloader)
 
-        return train_res, val_res
+        return trn_loss_ls, val_loss_ls
 
     def score(
         self,
-        dloader: DataLoader
+        dloader: DataLoader, 
+        batch: bool = False
     ) -> dict:
         '''
         Score model performance on provided data.
@@ -135,18 +137,24 @@ class NeuralNetworkRegression(nn.Module):
         dloader : Tuple[ArrayLike, ArrayLike]
             Data containing features (x) as first element and
             target (y) as second.
+
+        batch : uses batching to calculate the score. Useful if test set is large 
+                and won't fit into memory, but a lot slower. 
         '''
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
         
         self.model.to(device)
         self.model.eval()
 
+      
+
+
+        loss_fn = nn.MSELoss()
         total_loss = 0
         all_preds = []
-        all_targets = []
-        
+        all_targets = []        
         # get loss + predictions 
-        loss_fn = nn.MSELoss()
+        t1 = time.time()
         with torch.no_grad():
             for inputs, targets in dloader:
                 inputs, targets = inputs.to(device), targets.to(device)
@@ -158,13 +166,17 @@ class NeuralNetworkRegression(nn.Module):
 
         all_preds = np.concatenate(all_preds, axis=0)
         all_targets = np.concatenate(all_targets, axis=0)
+        avg_loss = total_loss / len(dloader)
+        t2 = time.time()
+        print(f"Scoring time taken is {t2-t1}")
+        
 
         # get performance metrics
         pearson_r, _ = pearsonr(all_preds.flatten(),
                                 all_targets.flatten())
         pearson_r = pearson_r.item()
         r2 = r2_score(all_targets, all_preds)
-        avg_loss = total_loss / len(dloader)
+        
 
         return {
             'pearson_r': pearson_r,

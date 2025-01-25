@@ -1,14 +1,11 @@
 import numpy as np
-
-from benchmarking.ablation import ablation_test
-from benchmarking.extrapolation import extrapolation_test
-from benchmarking.positional_extrapolation import positional_extrapolation_test
 from benchmarking.interpolation import interpolation_test
 
 from benchmarking.file_proc import make_landscape_data_dicts, sub_dict
 
 import time
 import random
+
 
 ALPHABET = 'ACDEFG'
 SEQ_LEN  = 6
@@ -18,7 +15,7 @@ N_EPOCHS = 1
 PATIENCE = 10
 MIN_DELTA = 1e-5
 
-#ablation NK 
+#interpolation NK 
 def main(): 
     print('Loading data and hyperparameter optimisation.')
     model_dict, data_dict = make_landscape_data_dicts(data_dir='./data/nk_landscapes/', 
@@ -36,19 +33,19 @@ def main():
     print('Training and testing models.')
 
     t1 = time.time()
-    ablation_results = ablation_test(model_dict=model_dict, 
-                                    landscape_dict=small_dict, 
-                                    sequence_len=6, 
-                                    alphabet_size=len(ALPHABET), 
-                                    file_name='ablation_results_NK',
-                                    directory= './results/',
-                                    n_epochs=N_EPOCHS, 
-                                    patience=PATIENCE,
-                                    min_delta=MIN_DELTA
-                                    )
+    interpolation_results = interpolation_test(model_dict=model_dict, 
+                                                landscape_dict=small_dict, 
+                                                sequence_len=6, 
+                                                alphabet_size=len(ALPHABET), 
+                                                file_name='interpolation_results_NK',
+                                                directory= './results/',
+                                                n_epochs=N_EPOCHS, 
+                                                patience=PATIENCE,
+                                                min_delta=MIN_DELTA
+                                                )
     t2 = time.time()
     
-    with open('ablation_time.log', 'w') as file: 
+    with open('./results/interpolation_time.log', 'w') as file: 
         file.write("Time taken: {}".format(t2-t1))       
 
 

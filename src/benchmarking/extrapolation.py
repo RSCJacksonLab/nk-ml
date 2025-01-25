@@ -138,6 +138,8 @@ def extrapolation_test(model_dict: dict,
                         test_datasets.append([x_tst, y_tst])
 
                     for j, d in enumerate(distances):
+
+                        print('Working on distance {}'.format(d))
                         # get training and testing data
                         j += 1
                         x_training = collapse_concat(

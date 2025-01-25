@@ -28,7 +28,10 @@ def interpolation_test(model_dict: dict,
                       cross_validation: int = 1,
                       save: bool = True,
                       file_name: Optional[str] = None,
-                      directory: str = "Results/"):
+                      directory: str = "results/", 
+                      n_epochs: int = 10, 
+                      patience: int = 5, 
+                      min_delta: float = 1e-5):
     """
     Interpolation function that takes a dictionary of models and a
     landscape dictionary and iterates over all models and landscapes,
@@ -123,9 +126,16 @@ def interpolation_test(model_dict: dict,
                             **model_hparams
                         )
                         # train model
-                        loaded_model.fit((x_trn, y_trn))
+                        print('Fitting model')
+                        loaded_model.fit((x_trn,
+                                          y_trn),
+                                          n_epochs=n_epochs, 
+                                          patience=patience, 
+                                          min_delta=min_delta 
+                                         )
 
                         # score model
+                        print('Scoring model')
                         train_dset = make_dataset(
                             (x_trn, y_trn)
                         )
@@ -185,7 +195,7 @@ def interpolation_test(model_dict: dict,
                         loaded_model = model_class(
                             **kwargs_filtered
                         )
-                        # train model on ablated data
+                        # train model
                         print('Fitting model')
                         loaded_model.fit(x_trn, y_trn)
 
