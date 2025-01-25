@@ -211,7 +211,7 @@ def train_model(model: nn.Module,
             
             optimizer.zero_grad()
             y_pred = model(x_batch)
-            loss = loss_fn(y_pred, y_batch)
+            loss = loss_fn(y_pred, y_batch.unsqueeze(-1))
             loss.backward()
             optimizer.step()
             
@@ -230,14 +230,14 @@ def train_model(model: nn.Module,
                 inputs, targets = inputs.to(device), targets.to(device)
                 
                 outputs = model(inputs)
-                loss = loss_fn(outputs, targets)
+                loss = loss_fn(outputs, targets.unsqueeze(-1))
                 val_loss += loss.item()
         val_loss /= len(val_loader)
         val_epoch_losses.append(val_loss)
 
         print(
-            f"Epoch [{epoch+1}/{n_epochs}], Train Loss: {train_loss:.4f}, "
-            f"Val Loss: {val_loss:.4f}"
+            f"Epoch [{epoch+1}/{n_epochs}], Train Loss: {train_loss}, "
+            f"Val Loss: {val_loss}"
         )
 
         # Check early stopping
@@ -249,7 +249,7 @@ def train_model(model: nn.Module,
     # Load the best model after early stopping
     model.load_state_dict(torch.load(early_stopping.path))
 
-    # delete best model from early stopiig from disk 
+    # delete best model from early stoping from disk 
     if os.path.exists(early_stopping.path):
       os.remove(early_stopping.path)
     else:

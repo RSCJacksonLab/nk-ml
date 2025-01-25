@@ -29,7 +29,10 @@ def ablation_test(model_dict: dict,
                   file_name: Optional[str] = None,
                   shuffle: bool = True,
                   sample_densities: List[float] = [0.9, 0.7, 0.5, 0.3, 0.1],
-                  directory: str = "results/"):
+                  directory: str = "results/",
+                  n_epochs: int = 30, 
+                  patience: int = 5,
+                  min_delta: float = 1e-5):
     """
     Interpolation function that takes a dictionary of models and a
     landscape dictionary and iterates over all models and landscapes,
@@ -103,7 +106,7 @@ def ablation_test(model_dict: dict,
 
             results = {}
 
-            # Iterate over each instance of each landscape
+            # Iterate over each instance of landscape landscape
             for idx, instance in enumerate(landscape_dict[landscape_name]):
 
                 # update result dict
@@ -159,7 +162,9 @@ def ablation_test(model_dict: dict,
                             print('Fitting model')
                             loaded_model.fit((actual_x_train, 
                                               actual_y_train),
-                                              n_epochs=30)
+                                              n_epochs=n_epochs, 
+                                              patience=patience,
+                                              min_delta=min_delta)
 
                             # score model
                             print('Scoring model')

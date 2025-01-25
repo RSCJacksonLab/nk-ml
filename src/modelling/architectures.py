@@ -151,7 +151,7 @@ class NeuralNetworkRegression(nn.Module):
             for inputs, targets in dloader:
                 inputs, targets = inputs.to(device), targets.to(device)
                 outputs = self.model(inputs)
-                loss = loss_fn(outputs, targets)
+                loss = loss_fn(outputs, targets.unsqueeze(-1))
                 total_loss += loss.item()
                 all_preds.append(outputs.cpu().numpy())
                 all_targets.append(targets.cpu().numpy())
