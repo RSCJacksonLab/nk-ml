@@ -33,7 +33,10 @@ def extrapolation_test(model_dict: dict,
                        cross_validation: int = 1,
                        save: bool = True,
                        file_name: Optional[str] = None,
-                       directory: str = "Results/"):
+                       directory: str = "results/", 
+                       n_epochs: int = 30, 
+                       patience: int = 5, 
+                       min_delta: float = 1e-5):
     """
     Extrapolation function that takes a dictionary of models and a
     landscape dictionary and iterates over all models and landscapes,
@@ -124,6 +127,7 @@ def extrapolation_test(model_dict: dict,
                     train_datasets = []
                     test_datasets = []
 
+                    print('Creating distance-based train and test datasets')
                     for d in distances:
 
                         if not f"train distance {d}" in results[instance].keys():
@@ -133,13 +137,15 @@ def extrapolation_test(model_dict: dict,
                             split=split,
                             distance=d,
                             random_state=fold,
+                            convert_to_ohe=True,
+                            flatten_ohe=False
                         )
                         train_datasets.append([x_trn, y_trn])
                         test_datasets.append([x_tst, y_tst])
 
                     for j, d in enumerate(distances):
 
-                        print('Working on distance {}'.format(d))
+                        print('Training on distance {}'.format(d))
                         # get training and testing data
                         j += 1
                         x_training = collapse_concat(
@@ -155,7 +161,13 @@ def extrapolation_test(model_dict: dict,
                                 **model_hparams
                             )
                             # train model
-                            loaded_model.fit((x_training, y_training))
+                            print(x_training.shape)
+                            print(y_training.shape)
+
+                            loaded_model.fit((x_training, y_training),
+                                             n_epochs=n_epochs, 
+                                             patience=patience, 
+                                             min_delta=min_delta)
                             print(
                                 f"{model_name} trained on Dataset "
                                 f"{landscape_name} distances 1-{d}"
@@ -165,7 +177,8 @@ def extrapolation_test(model_dict: dict,
                             train_dset = make_dataset(
                                 (x_training, y_training)
                             )
-                            train_dloader = DataLoader(train_dset)
+                            train_dloader = DataLoader(train_dset, 
+                                                       batch_size=2048)
                             score_train = loaded_model.score(
                                 train_dloader
                             )
@@ -174,13 +187,19 @@ def extrapolation_test(model_dict: dict,
                             score["train"] = score_train
 
                             # score on different distance test sets
-                            for dist_idx, dist_dset in test_datasets:
+                            #print(test_datasets[0])
+                            for dist_idx, dist_dset in enumerate(test_datasets):
+                                print(f'Testing on distance {dist_idx}')
                                 x_tst = dist_dset[0]
                                 y_tst = dist_dset[1]
+                                print(x_tst.shape)
+                                print(y_tst.shape)
+
                                 test_dset = make_dataset(
                                     (x_tst, y_tst)
                                 )
-                                test_dloader = DataLoader(test_dset)
+                                test_dloader = DataLoader(test_dset, 
+                                                          batch_size=2048)
                                 score_test = loaded_model.score(
                                     test_dloader,
                                 )
@@ -287,7 +306,7 @@ def extrapolation_test(model_dict: dict,
                                     "data_split": data_split,
                                     "pearson_r": metrics.get("pearson_r", None),
                                     "r2": metrics.get("r2", None),
-                                    "mse": metrics.get("mse", None)
+                                    "mse_loss": metrics.get("loss", None)
                                 })
 
         # Create a DataFrame from the rows

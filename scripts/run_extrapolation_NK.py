@@ -17,7 +17,7 @@ N_EPOCHS = 1
 PATIENCE = 10
 MIN_DELTA = 1e-5
 
-#ablation NK 
+#extrapolation NK 
 def main(): 
     print('Loading data and hyperparameter optimisation.')
     model_dict, data_dict = make_landscape_data_dicts(data_dir='./data/nk_landscapes/', 
@@ -33,21 +33,20 @@ def main():
 
 
     print('Training and testing models.')
-
     t1 = time.time()
-    ablation_results = ablation_test(model_dict=model_dict, 
-                                    landscape_dict=small_dict, 
-                                    sequence_len=6, 
-                                    alphabet_size=len(ALPHABET), 
-                                    file_name='ablation_results_NK',
-                                    directory= './',
-                                    n_epochs=N_EPOCHS, 
-                                    patience=PATIENCE,
-                                    min_delta=MIN_DELTA
-                                    )
+    extrapolation_results = extrapolation_test(model_dict=model_dict, 
+                                                landscape_dict=small_dict, 
+                                                sequence_len=6, 
+                                                alphabet_size=len(ALPHABET), 
+                                                file_name='extrapolation_results_NK',
+                                                directory= './',
+                                                n_epochs=N_EPOCHS, 
+                                                patience=PATIENCE,
+                                                min_delta=MIN_DELTA
+                                                )
     t2 = time.time()
     
-    with open('./ablation_time.log', 'w') as file: 
+    with open('./extrapolation_time.log', 'w') as file: 
         file.write("Time taken: {}".format(t2-t1))       
 
 
