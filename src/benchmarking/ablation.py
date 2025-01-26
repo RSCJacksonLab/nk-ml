@@ -182,10 +182,11 @@ def ablation_test(model_dict: dict,
                             score_test = loaded_model.score(
                                 test_dloader,
                             )
-
+                                
                             score = {
                                 'train': score_train,
                                 'test': score_test
+                                
                             }
                         else:
                             continue #for testing 
@@ -295,7 +296,7 @@ def ablation_test(model_dict: dict,
                                     "data_split": data_split,
                                     "pearson_r": metrics.get("pearson_r", None),
                                     "r2": metrics.get("r2", None),
-                                    "mse": metrics.get("mse", None)
+                                    "mse": metrics.get("mse_loss", None)
                                 })
 
         # Create a DataFrame from the rows

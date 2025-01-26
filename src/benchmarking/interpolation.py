@@ -139,14 +139,14 @@ def interpolation_test(model_dict: dict,
                         train_dset = make_dataset(
                             (x_trn, y_trn)
                         )
-                        train_dloader = DataLoader(train_dset)
+                        train_dloader = DataLoader(train_dset, batch_size=2048)
                         score_train = loaded_model.score(
                             train_dloader
                         )
                         test_dset = make_dataset(
                             (x_tst, y_tst)
                         )
-                        test_dloader = DataLoader(test_dset)
+                        test_dloader = DataLoader(test_dset, batch_size=2048)
                         score_test = loaded_model.score(
                             test_dloader,
                         )
@@ -192,6 +192,9 @@ def interpolation_test(model_dict: dict,
                             for hparam, value in model_hparams.items()
                             if hparam in model_kwargs.parameters
                         }
+                        if model_name == "rf": 
+                            kwargs_filtered['n_jobs']=-1
+
                         loaded_model = model_class(
                             **kwargs_filtered
                         )

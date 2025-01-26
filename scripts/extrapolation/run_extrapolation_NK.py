@@ -5,23 +5,19 @@ from benchmarking.extrapolation import extrapolation_test
 from benchmarking.file_proc import make_landscape_data_dicts, sub_dict
 
 import time
-import random
-
-random.seed(10) 
-
 
 ALPHABET = 'ACDEFG'
 SEQ_LEN  = 6
-N_REPLICATES = 1
-N_EPOCHS = 1
-PATIENCE = 10
+N_REPLICATES = 8
+N_EPOCHS = 100
+PATIENCE = 5
 MIN_DELTA = 1e-5
 
 #extrapolation NK 
 def main(): 
     print('Loading data and hyperparameter optimisation.')
-    model_dict, data_dict = make_landscape_data_dicts(data_dir='./data/nk_landscapes/', 
-                                                      model_dir='./hyperopt/ohe/nk_landscape_hparams/', 
+    model_dict, data_dict = make_landscape_data_dicts(data_dir='../../data/nk_landscapes/', 
+                                                      model_dir='../../hyperopt/ohe/nk_landscape_hparams/', 
                                                       alphabet=ALPHABET)
     
     
@@ -39,15 +35,15 @@ def main():
                                                 sequence_len=6, 
                                                 alphabet_size=len(ALPHABET), 
                                                 file_name='extrapolation_results_NK',
-                                                directory= './',
+                                                directory= '../../results/',
                                                 n_epochs=N_EPOCHS, 
                                                 patience=PATIENCE,
                                                 min_delta=MIN_DELTA
                                                 )
     t2 = time.time()
     
-    with open('./extrapolation_time.log', 'w') as file: 
-        file.write("Time taken: {}".format(t2-t1))       
+    with open('../../results/extrapolation_time.log', 'w') as file: 
+        file.write(f"Time taken: {t2-t1} seconds")       
 
 
 if __name__ == "__main__": 

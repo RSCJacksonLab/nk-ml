@@ -202,6 +202,8 @@ def train_model(model: nn.Module,
 
     assert n_epochs>0, 'n_epochs not strictly greater than 0, ensure n_epochs > 0'
     
+    actual_epochs = 0
+
     for epoch in range(n_epochs):
         model.train()  # Training mode
         
@@ -239,6 +241,8 @@ def train_model(model: nn.Module,
             f"Epoch [{epoch+1}/{n_epochs}], Train Loss: {train_loss}, "
             f"Val Loss: {val_loss}"
         )
+        actual_epochs += 1
+
 
         # Check early stopping
         early_stopping(val_loss, model)
@@ -254,7 +258,7 @@ def train_model(model: nn.Module,
       os.remove(early_stopping.path)
     else:
       print("The file does not exist")
-    return model, train_epoch_losses, val_epoch_losses
+    return model, train_epoch_losses, val_epoch_losses, actual_epochs
 
 
 def get_trainable_params(model: nn.Module): 

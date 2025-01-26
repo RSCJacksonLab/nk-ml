@@ -20,8 +20,8 @@ MIN_DELTA = 1e-5
 #ablation NK 
 def main(): 
     print('Loading data and hyperparameter optimisation.')
-    model_dict, data_dict = make_landscape_data_dicts(data_dir='./data/nk_landscapes/', 
-                                                      model_dir='./hyperopt/ohe/nk_landscape_hparams/', 
+    model_dict, data_dict = make_landscape_data_dicts(data_dir='../data/nk_landscapes/', 
+                                                      model_dir='../hyperopt/ohe/nk_landscape_hparams/', 
                                                       alphabet=ALPHABET)
     
     
@@ -40,15 +40,15 @@ def main():
                                     sequence_len=6, 
                                     alphabet_size=len(ALPHABET), 
                                     file_name='ablation_results_NK',
-                                    directory= './',
+                                    directory= '../results/',
                                     n_epochs=N_EPOCHS, 
                                     patience=PATIENCE,
                                     min_delta=MIN_DELTA
                                     )
     t2 = time.time()
     
-    with open('./ablation_time.log', 'w') as file: 
-        file.write("Time taken: {}".format(t2-t1))       
+    with open('../results/ablation_time.log', 'w') as file: 
+        file.write("Time taken: {} seconds".format(t2-t1))       
 
 
 if __name__ == "__main__": 

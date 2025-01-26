@@ -145,7 +145,7 @@ def extrapolation_test(model_dict: dict,
 
                     for j, d in enumerate(distances):
 
-                        print('Training on distance {}'.format(d))
+                        print(f'Training on distance 1-{d}')
                         # get training and testing data
                         j += 1
                         x_training = collapse_concat(
@@ -154,15 +154,15 @@ def extrapolation_test(model_dict: dict,
                         y_training = collapse_concat(
                             [x[1] for x in train_datasets[:j]]
                         )
-                        if model_name not in ["gb", "rf"]:
 
+
+                        if model_name not in ["gb", "rf"]:
                             loaded_model = architectures.NeuralNetworkRegression(
                                 model_name,
                                 **model_hparams
                             )
                             # train model
-                            print(x_training.shape)
-                            print(y_training.shape)
+
 
                             loaded_model.fit((x_training, y_training),
                                              n_epochs=n_epochs, 
@@ -185,15 +185,15 @@ def extrapolation_test(model_dict: dict,
 
                             score = {}
                             score["train"] = score_train
+                            score["train"]["train_epochs"] = loaded_model.actual_epochs
 
                             # score on different distance test sets
                             #print(test_datasets[0])
                             for dist_idx, dist_dset in enumerate(test_datasets):
-                                print(f'Testing on distance {dist_idx}')
+                                print(f'Testing on distance {dist_idx+1}')
                                 x_tst = dist_dset[0]
                                 y_tst = dist_dset[1]
-                                print(x_tst.shape)
-                                print(y_tst.shape)
+                              
 
                                 test_dset = make_dataset(
                                     (x_tst, y_tst)
@@ -203,9 +203,9 @@ def extrapolation_test(model_dict: dict,
                                 score_test = loaded_model.score(
                                     test_dloader,
                                 )
+                                print(f'Score this distance: {score_test}')
                                 score[f"test_dist{distances[dist_idx]}"] = score_test
                         else:
-
                             # flatten input data 
                             x_training = [
                                 i.flatten().reshape(-1, 1) 
@@ -233,6 +233,9 @@ def extrapolation_test(model_dict: dict,
                                 for hparam, value in model_hparams.items()
                                 if hparam in model_kwargs.parameters
                             }
+                            if model_name == "rf": 
+                                kwargs_filtered['n_jobs']=-1
+
                             loaded_model = model_class(
                                 **kwargs_filtered
                             )
@@ -248,8 +251,14 @@ def extrapolation_test(model_dict: dict,
                             score = {
                                 'train': train_score
                             }
+
+                            print(
+                                f"{model_name} trained on Dataset "
+                                f"{landscape_name} distances 1-{d}"
+                            )
                             # get model performance on data greater than distance
-                            for dist_idx, dist_dset in test_datasets:
+                            for dist_idx, dist_dset in enumerate(test_datasets):
+                                print(f'Testing on distance {dist_idx+1}')
                                 x_tst = dist_dset[0]
                                 y_tst = dist_dset[1]
 
@@ -269,7 +278,7 @@ def extrapolation_test(model_dict: dict,
                                     x_tst,
                                     y_tst,
                                 )
-
+                                print(f'Score this distance: {score_test}')
                                 score[f"test_dist{distances[dist_idx]}"] = score_test
 
                         results[instance][f"train distance {d}"][fold] = score
@@ -306,7 +315,8 @@ def extrapolation_test(model_dict: dict,
                                     "data_split": data_split,
                                     "pearson_r": metrics.get("pearson_r", None),
                                     "r2": metrics.get("r2", None),
-                                    "mse_loss": metrics.get("loss", None)
+                                    "mse_loss": metrics.get("mse_loss", None), 
+                                    "train_epochs": metrics.get("train_epochs", None)
                                 })
 
         # Create a DataFrame from the rows

@@ -4,13 +4,11 @@ from benchmarking.interpolation import interpolation_test
 from benchmarking.file_proc import make_landscape_data_dicts, sub_dict
 
 import time
-import random
 
 
 ALPHABET = 'ACDEFG'
 SEQ_LEN  = 6
-random.seed(10) 
-N_REPLICATES = 4 
+N_REPLICATES = 1
 N_EPOCHS = 1
 PATIENCE = 10
 MIN_DELTA = 1e-5
@@ -18,8 +16,8 @@ MIN_DELTA = 1e-5
 #interpolation NK 
 def main(): 
     print('Loading data and hyperparameter optimisation.')
-    model_dict, data_dict = make_landscape_data_dicts(data_dir='./data/nk_landscapes/', 
-                                                      model_dir='./hyperopt/ohe/nk_landscape_hparams/', 
+    model_dict, data_dict = make_landscape_data_dicts(data_dir='../../data/nk_landscapes/', 
+                                                      model_dir='../../hyperopt/ohe/nk_landscape_hparams/', 
                                                       alphabet=ALPHABET)
     
     
@@ -38,15 +36,15 @@ def main():
                                                 sequence_len=6, 
                                                 alphabet_size=len(ALPHABET), 
                                                 file_name='interpolation_results_NK',
-                                                directory= './results/',
+                                                directory= '../../results/',
                                                 n_epochs=N_EPOCHS, 
                                                 patience=PATIENCE,
                                                 min_delta=MIN_DELTA
                                                 )
     t2 = time.time()
     
-    with open('./results/interpolation_time.log', 'w') as file: 
-        file.write("Time taken: {}".format(t2-t1))       
+    with open('../../results/interpolation_time.log', 'w') as file: 
+        file.write(f"Time taken: {t2-t1}")       
 
 
 if __name__ == "__main__": 

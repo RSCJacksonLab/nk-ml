@@ -103,5 +103,5 @@ def score_sklearn_model(
     return {
         'pearson_r': corr,
         'r2': r2,
-        'mse': mse
+        'mse_loss': mse
     }

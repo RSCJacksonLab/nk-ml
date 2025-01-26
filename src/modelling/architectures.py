@@ -104,7 +104,7 @@ class NeuralNetworkRegression(nn.Module):
         optimizer = torch.optim.Adam(self.model.parameters(), 
                                      lr=self.lr)
         
-        model, trn_loss_ls, val_loss_ls = train_model(
+        model, trn_loss_ls, val_loss_ls, actual_epochs = train_model(
             self.model,
             optimizer,
             loss_fn,
@@ -117,6 +117,8 @@ class NeuralNetworkRegression(nn.Module):
         self.model = model
         self.trn_loss_ls = trn_loss_ls
         self.val_loss_ls = val_loss_ls
+        self.actual_epochs = actual_epochs
+        
 
         # get full scoring for train and validation data -- commented out for efficiency
         #train_res = self.score(trn_dloader)
@@ -181,7 +183,7 @@ class NeuralNetworkRegression(nn.Module):
         return {
             'pearson_r': pearson_r,
             'r2': r2,
-            'loss': avg_loss
+            'mse_loss': avg_loss
         }
 
 class SequenceRegressionLinear(nn.Module): 
