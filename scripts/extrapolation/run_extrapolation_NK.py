@@ -1,16 +1,15 @@
 import numpy as np
 
 from benchmarking.extrapolation import extrapolation_test
-
 from benchmarking.file_proc import make_landscape_data_dicts, sub_dict
 
 import time
 
 ALPHABET = 'ACDEFG'
 SEQ_LEN  = 6
-N_REPLICATES = 8
+N_REPLICATES = 4
 N_EPOCHS = 100
-PATIENCE = 5
+PATIENCE = 8
 MIN_DELTA = 1e-5
 
 #extrapolation NK 
