@@ -34,7 +34,8 @@ def positional_extrapolation_test(model_dict: dict,
                                   directory: str = "results/", 
                                   n_epochs: int = 30, 
                                   patience: int = 5, 
-                                  min_delta: float = 1e-5):
+                                  min_delta: float = 1e-5, 
+                                  inclusive: bool = False):
     """
     Positional extrapolation function that takes a dictionary of models and a
     landscape dictionary and iterates over all models and landscapes,
@@ -134,19 +135,21 @@ def positional_extrapolation_test(model_dict: dict,
                         if not fold in results[instance][actual_pos].keys():
                             results[instance][actual_pos][fold] = {}
                         
-                        t_pos =positions[:pos_idx + 1]
-                        print(t_pos)
-                                         
+                        if not inclusive:                     
 
-                        x_trn, y_trn, x_tst, y_tst = landscape_instance.sklearn_data(
-                            split=split,
-                            positions=positions[:pos_idx + 1], 
-                            random_state=fold,
-                            convert_to_ohe=True, 
-                            flatten_ohe=False
-                        )
-                        train_datasets.append([x_trn, y_trn])
-                        test_datasets.append([x_tst, y_tst])
+                            x_trn, y_trn, x_tst, y_tst = landscape_instance.sklearn_data(
+                                split=split,
+                                positions=positions[:pos_idx + 1], 
+                                random_state=fold,
+                                convert_to_ohe=True, 
+                                flatten_ohe=False
+                            )
+                            train_datasets.append([x_trn, y_trn])
+                            test_datasets.append([x_tst, y_tst])
+
+                        #this loop segregates the test data so x_p3 ONLY includes positions varying at 3 pso
+                        else: 
+                            continue 
 
 
                     # train_datasets are composed [[x_p1, y_p1],[x_p2, y_p2], ..., n_positions],
