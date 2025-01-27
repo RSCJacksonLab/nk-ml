@@ -89,11 +89,20 @@ class NeuralNetworkRegression(nn.Module):
         if val_data is not None:
             val_dset = make_dataset(val_data)
         else:
+            # implemented this method to catch val dsets with length 0
+            dset_size  = len(trn_dset)
+            train_size = int(0.8 * dset_size)  # 80% training
+            val_size   = dset_size - train_size # rest val 
+
             random_state = torch.Generator().manual_seed(0)
             trn_dset, val_dset = random_split(trn_dset, 
-                                              [0.8, 0.2], 
+                                              [train_size, val_size], 
                                               generator=random_state)
-        
+
+            assert len(val_dset) > 0, "Validation set size must be greater than 0"
+            assert len(trn_dset) > 0, "Training set size must be greater than 0"
+
+
         # make dataloaders
         trn_dloader = DataLoader(trn_dset, self.batch_size, shuffle=True)
         val_dloader = DataLoader(val_dset, self.batch_size, shuffle=False)
