@@ -1,6 +1,12 @@
 ''''
 Function for positional extrapolation testing
 ---------------------------------------------
+Definition of positional extrapolation: tasking the model with predicting
+the effect of a mutation at a position has not been altered in the training set.
+
+In positional extrapolation, the model is tasked with predicting the effect of mutations 
+at sequence positions that are never modified in the training data.
+
 Ensure test data includes mutations at sites where no variation is
 observed in the training data.
 
@@ -35,7 +41,7 @@ def positional_extrapolation_test(model_dict: dict,
                                   n_epochs: int = 30, 
                                   patience: int = 5, 
                                   min_delta: float = 1e-5, 
-                                  inclusive: bool = False):
+                                  inclusive: bool = True):
     """
     Positional extrapolation function that takes a dictionary of models and a
     landscape dictionary and iterates over all models and landscapes,
@@ -135,21 +141,51 @@ def positional_extrapolation_test(model_dict: dict,
                         if not fold in results[instance][actual_pos].keys():
                             results[instance][actual_pos][fold] = {}
                         
-                        if not inclusive:                     
 
-                            x_trn, y_trn, x_tst, y_tst = landscape_instance.sklearn_data(
-                                split=split,
-                                positions=positions[:pos_idx + 1], 
-                                random_state=fold,
-                                convert_to_ohe=True, 
-                                flatten_ohe=False
-                            )
-                            train_datasets.append([x_trn, y_trn])
-                            test_datasets.append([x_tst, y_tst])
+                        x_trn, y_trn, x_tst, y_tst = landscape_instance.sklearn_data(
+                            split=split,
+                            positions=positions[:pos_idx + 1], 
+                            random_state=fold,
+                            convert_to_ohe=True, 
+                            flatten_ohe=False
+                        )
+                        train_datasets.append([x_trn, y_trn])
+                        test_datasets.append([x_tst, y_tst])
 
-                        #this loop segregates the test data so x_p3 ONLY includes positions varying at 3 pso
-                        else: 
-                            continue 
+                    #this loop segregates the test data so x_p3 ONLY includes positions varying at 3 pso
+                    if not inclusive:                         
+                        exclusive_trn_dsets = [] #non-inclusive train datasets
+                        
+                        for j_pos_idx, j_pos_tst_dset in enumerate(test_datasets): 
+                            #pos_x_tst = j_pos_dset[0]
+                            
+                            if j_pos_idx>0:
+                                x_tst_prev_all = [i[0] for i in exclusive_trn_dsets]
+                                x_tst_prev_all = [i for j in x_tst_prev_all for i in j]
+                                
+                                x_tst_current = [i for i in j_pos_tst_dset[0]]
+                                y_tst_current = j_pos_tst_dset[1]
+                
+                                #find indices of the current position trn_dset that are not in the previous position trn_dset
+                                indices = [i for i, arr2 in enumerate(x_tst_current) if 
+                                           not any(np.array_equal(arr2, arr1) for arr1 in x_tst_prev_all)]
+                                
+                                x_tst_current_exclusive = j_pos_tst_dset[0][indices]
+                                y_tst_current_exclusive = j_pos_tst_dset[1][indices]
+                                continue                                
+
+                            else: 
+                                exclusive_trn_dsets.append(j_pos_tst_dset)
+                                
+
+
+                            
+                            
+
+
+    
+                            
+                            
 
 
                     # train_datasets are composed [[x_p1, y_p1],[x_p2, y_p2], ..., n_positions],
@@ -233,8 +269,8 @@ def positional_extrapolation_test(model_dict: dict,
                                     test_dloader,
                                 )
 
-                                print(f'Model {model_name} trained on pos {positions[:pos_idx]}, 
-                                       score on test position {positions[t_pos_idx]} is {score_test}')
+                                print(f'Model {model_name} trained on pos {positions[:pos_idx]}')
+                                print('score on test position {positions[t_pos_idx]} is {score_test}')
                                 
                                 score[f"test_pos{positions[t_pos_idx]}"] = score_test
 

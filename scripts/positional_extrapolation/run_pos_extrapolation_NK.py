@@ -36,7 +36,8 @@ def main():
                                                             directory= './results/',
                                                             n_epochs=N_EPOCHS, 
                                                             patience=PATIENCE,
-                                                            min_delta=MIN_DELTA
+                                                            min_delta=MIN_DELTA, 
+                                                            inclusive=False
                                                             )
     t2 = time.time()
     

@@ -1,0 +1,10 @@
+
+
+27/01/25 1355 hrs
+
+- double check pos extrapolation complete_results works for n_replicates>1 DONE
+- check extrapolation.py doesn't do inclusive testing DONE
+- define positional extrapolation clearly (in manuscript) DONE
+- write code for positional extrapolation non-inclusive testing 
+- run positional extrapolation if appropriate on lambda 
+- later: data visualisation of results so far 
