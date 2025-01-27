@@ -1,6 +1,12 @@
 ''''
 Function for positional extrapolation testing
 ---------------------------------------------
+Definition of positional extrapolation: tasking the model with predicting
+the effect of a mutation at a position has not been altered in the training set.
+
+In positional extrapolation, the model is tasked with predicting the effect of mutations 
+at sequence positions that are never modified in the training data.
+
 Ensure test data includes mutations at sites where no variation is
 observed in the training data.
 
@@ -31,9 +37,13 @@ def positional_extrapolation_test(model_dict: dict,
                                   cross_validation: int = 1,
                                   save: bool = True,
                                   file_name: Optional[str] = None,
-                                  directory: str = "Results/"):
+                                  directory: str = "results/", 
+                                  n_epochs: int = 30, 
+                                  patience: int = 5, 
+                                  min_delta: float = 1e-5, 
+                                  inclusive: bool = True):
     """
-    Interpolation function that takes a dictionary of models and a
+    Positional extrapolation function that takes a dictionary of models and a
     landscape dictionary and iterates over all models and landscapes,
     recording results, before finally (saving) and returning them.
 
@@ -82,13 +92,13 @@ def positional_extrapolation_test(model_dict: dict,
     }
     # iterate over model types
     for model_name in model_names: 
-        print('Working on model: {}'.format(model_name))
+        print(f'Working on model: {model_name}')
 
         # iterate over each landscape
         for landscape_name in landscape_dict.keys():
-            print('Working on landscape: {}'.format(landscape_name))
+            print(f'Working on landscape: {landscape_name}')
 
-            #extract model hparams
+            #extract model hparams -- model hparams are landscape-specific 
             model_hparams = model_dict[landscape_name][model_name]
 
             # add dataset properties to hparams
@@ -106,6 +116,8 @@ def positional_extrapolation_test(model_dict: dict,
 
                 landscape_instance = landscape_dict[landscape_name][instance]
 
+                # obtain positions that are mutated with reference to the seed sequence
+                # note that positions uses 0 indexing, so the first position will be 0
                 positions = landscape_instance.mutated_positions
 
                 print(
@@ -128,38 +140,102 @@ def positional_extrapolation_test(model_dict: dict,
 
                         if not fold in results[instance][actual_pos].keys():
                             results[instance][actual_pos][fold] = {}
+                        
 
                         x_trn, y_trn, x_tst, y_tst = landscape_instance.sklearn_data(
                             split=split,
-                            positions=positions[:pos_idx + 1]
+                            positions=positions[:pos_idx + 1], 
+                            random_state=fold,
+                            convert_to_ohe=True, 
+                            flatten_ohe=False
                         )
                         train_datasets.append([x_trn, y_trn])
                         test_datasets.append([x_tst, y_tst])
 
+                    #this loop segregates the test data so x_p3 ONLY includes positions varying at 3 pso
+                    if not inclusive:                         
+                        exclusive_trn_dsets = [] #non-inclusive train datasets
+                        
+                        for j_pos_idx, j_pos_tst_dset in enumerate(test_datasets): 
+                            #pos_x_tst = j_pos_dset[0]
+                            
+                            if j_pos_idx>0:
+                                x_tst_prev_all = [i[0] for i in exclusive_trn_dsets]
+                                x_tst_prev_all = [i for j in x_tst_prev_all for i in j]
+                                
+                                x_tst_current = [i for i in j_pos_tst_dset[0]]
+                                y_tst_current = j_pos_tst_dset[1]
+                
+                                #find indices of the current position trn_dset that are not in the previous position trn_dset
+                                indices = [i for i, arr2 in enumerate(x_tst_current) if 
+                                           not any(np.array_equal(arr2, arr1) for arr1 in x_tst_prev_all)]
+                                
+                                x_tst_current_exclusive = j_pos_tst_dset[0][indices]
+                                y_tst_current_exclusive = j_pos_tst_dset[1][indices]
+                                continue                                
+
+                            else: 
+                                exclusive_trn_dsets.append(j_pos_tst_dset)
+                                
+
+
+                            
+                            
+
+
+    
+                            
+                            
+
+
+                    # train_datasets are composed [[x_p1, y_p1],[x_p2, y_p2], ..., n_positions],
+                    # where x_p1 is a list of np arrays consisting of train examples from only 
+                    # the first position mutated, x_p2 the first AND second positions mutated, and so on
+                    # 
+                    # test_datasets are composed [[x_p1, y_p1],[x_p2, y_p2], ..., n_positions],
+                    # where x_p1 is a list of np arrays consisting of test examples from only 
+                    # the first position mutated, x_p2 the first AND second positions mutated, and so on
+                    #
+                    # A 80/20 train/test ratio is used at each mutational position by default (can be changed). 
+                    # Train and test datasets are inclusive of the 'seed' sequence. 
+                    #
+                    # in the below train/test loop, models are iteratively trained on each element
+                    # of train_datasets i.e. on [x_p1, y_p1], [xp2, y_p2]..etc BUT tested on EVERY
+                    # element on test_datasets in each loop, permitting testing of positional 
+                    # extrapolation 
+
                     # for each test/train split - train and test models
                     for pos_idx in range(len(positions)):
-
-                        actual_pos = int(positions[pos_idx])
-                        pos_idx += 1
-
+                        
+                        actual_pos = int(positions[pos_idx]) #get the actual position 
+                        
+                        pos_idx += 1 # add 1 for python list slicing below
+                                     # so, for pos_idx 0, the below slice will include the value at 0th index
                         x_training = collapse_concat(
                             [x[0] for x in train_datasets[:pos_idx]]
                         )
                         y_training = collapse_concat(
                             [x[1] for x in train_datasets[:pos_idx]]
                         )
-                        if model_name not in ["gb", "rf"]:
+
+                        if model_name not in ["gb", "rf", "linear", "mlp", 
+                                              "blstm", "ulstm", "transformer"]:
 
                             loaded_model = architectures.NeuralNetworkRegression(
                                 model_name,
                                 **model_hparams
                             )
+
+
                             # train model
-                            loaded_model.fit(x_training, 
-                                             y_training.reshape(-1,1))
+                            loaded_model.fit((x_training, 
+                                             y_training), 
+                                             n_epochs=n_epochs, 
+                                             patience=patience, 
+                                             min_delta=min_delta)
                             print(
-                                f"{model_name} trained on Dataset "
-                                f"{landscape_name} positions"
+                                f"{model_name} trained on dataset "
+                                f"{landscape_name} positions "
                                 f"{positions[:pos_idx]}"
                             )
     
@@ -167,25 +243,37 @@ def positional_extrapolation_test(model_dict: dict,
                             train_dset = make_dataset(
                                 (x_training, y_training)
                             )
-                            train_dloader = DataLoader(train_dset)
-                            score_train = loaded_model.score(
-                                train_dloader
-                            )
+                            train_dloader = DataLoader(train_dset, 
+                                                       batch_size=2048)
+
+                            score_train = loaded_model.score(train_dloader)
+                            score_train["train_epochs"] = loaded_model.actual_epochs
+
                             score = {
                                 'train': score_train,
                             }
                             # score on different distance test sets
-                            for pos_idx, pos_dset in test_datasets:
+                            for t_pos_idx, pos_dset in enumerate(test_datasets):
                                 x_tst = pos_dset[0]
                                 y_tst = pos_dset[1]
+
+
+
+
                                 test_dset = make_dataset(
                                     (x_tst, y_tst)
                                 )
-                                test_dloader = DataLoader(test_dset)
+                                test_dloader = DataLoader(test_dset, 
+                                                          batch_size=2048)
                                 score_test = loaded_model.score(
                                     test_dloader,
                                 )
-                                score[f"test_pos{positions[pos_idx]}"] = score_test
+
+                                print(f'Model {model_name} trained on pos {positions[:pos_idx]}')
+                                print('score on test position {positions[t_pos_idx]} is {score_test}')
+                                
+                                score[f"test_pos{positions[t_pos_idx]}"] = score_test
+
 
                         else:
 
@@ -216,16 +304,21 @@ def positional_extrapolation_test(model_dict: dict,
                                 for hparam, value in model_hparams.items()
                                 if hparam in model_kwargs.parameters
                             }
+
+                            if model_name == "rf": 
+                                kwargs_filtered['n_jobs']=-1
+                            
+                            #initialise model with hyperparams
                             loaded_model = model_class(
                                 **kwargs_filtered
                             )
-                            # train model on data less than distance
+                            # train model on appropriate positional training data
                             loaded_model.fit(x_training, y_training)
 
                             print(
-                                f"{model_name} trained on Dataset"
+                                f"{model_name} trained on dataset"
                                 f" {landscape_name} positions "
-                                f"{positions[pos_idx]}."
+                                f"{positions[:pos_idx]}."
                             )
 
                             # get model performance
@@ -239,7 +332,7 @@ def positional_extrapolation_test(model_dict: dict,
                             }
                             
                             # get model performance on data greater than distance
-                            for pos_idx, pos_dset in test_datasets:
+                            for pos_idx, pos_dset in enumerate(test_datasets):
                                 x_tst = pos_dset[0]
                                 y_tst = pos_dset[1]
 
@@ -259,7 +352,7 @@ def positional_extrapolation_test(model_dict: dict,
                                     x_tst,
                                     y_tst,
                                 )
-
+                                print(f'Model {model_name} score on test position {positions[pos_idx]} is {score_test}')
                                 score[f"test_pos{positions[pos_idx]}"] = score_test
 
                         results[instance][actual_pos][fold] = score
@@ -296,7 +389,8 @@ def positional_extrapolation_test(model_dict: dict,
                                     "data_split": data_split,
                                     "pearson_r": metrics.get("pearson_r", None),
                                     "r2": metrics.get("r2", None),
-                                    "mse": metrics.get("mse", None)
+                                    "mse_loss": metrics.get("mse_loss", None), 
+                                    "train_epochs": metrics.get("train_epochs", None)
                                 })
 
         # Create a DataFrame from the rows
