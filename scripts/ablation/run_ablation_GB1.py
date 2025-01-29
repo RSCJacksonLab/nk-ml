@@ -1,51 +1,43 @@
 import numpy as np
 
-from benchmarking.extrapolation import extrapolation_test
+from benchmarking.ablation import ablation_test
+
 from benchmarking.file_proc import make_landscape_data_dicts, sub_dict
 
 import time
+import random
+
+random.seed(10) 
+
 
 ALPHABET = 'ACDEFGHIKLMNPQRSTVWY'
 SEQ_LEN  = 4
-N_REPLICATES = 4
+N_REPLICATES = 1 
 N_EPOCHS = 1
-PATIENCE = 8
+PATIENCE = 10
 MIN_DELTA = 1e-5
 
-# landscape dict {k1: {r1: ProteinLandscape(), r2: PL}, k2: }
-# model_dict = {k1: {model_name: {hparams}}}
-
-#extrapolation GB1 
+#ablation GB1
 def main(): 
     print('Loading data and hyperparameter optimisation.')
-
-    
-
-    #model_dict, data_dict = make_landscape_data_dicts(
-    # data_dir='./data/nk_landscapes/', 
-    # model_dir='./hyperopt/ohe/nk_landscape_hparams/', 
-    # alphabet=ALPHABET)
-
-
-    
     model_dict, data_dict = make_landscape_data_dicts(
         data_dir='./data/experimental_datasets/', 
         model_dir='./hyperopt/ohe/gb1_hparams/', 
         alphabet=ALPHABET, 
         experimental=True, 
-        n_replicates=4, 
-        
+        n_replicates=4
         )
-
+    
 
     print('Training and testing models.')
+
     t1 = time.time()
-    extrapolation_results = extrapolation_test(
+    ablation_results = ablation_test(
         model_dict=model_dict, 
         landscape_dict=data_dict, 
         sequence_len=SEQ_LEN, 
         alphabet_size=len(ALPHABET), 
-        file_name='extrapolation_results_GB1',
+        file_name='ablation_results_GB1',
         directory= './results/',
         n_epochs=N_EPOCHS, 
         patience=PATIENCE,
@@ -53,8 +45,8 @@ def main():
         )
     t2 = time.time()
     
-    with open('./results/extrapolation_time_GB1.log', 'w') as file: 
-        file.write(f"Time taken: {t2-t1} seconds")       
+    with open('./results/ablation_time_GB1.log', 'w') as file: 
+        file.write("Time taken: {} seconds".format(t2-t1))       
 
 
 if __name__ == "__main__": 

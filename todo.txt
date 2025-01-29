@@ -8,6 +8,8 @@
 
 - write code for positional extrapolation non-inclusive testing NOT DONE -- for consideration
 - run positional extrapolation if appropriate on lambda NOT DONE -- for consideration
-- later: data visualisation of results so far NOT DONE -- will do later this week 
+- later: data visualisation of results so far done
+
+- run extrapolation, ablation, pos extrap on Gb1 
 
 
