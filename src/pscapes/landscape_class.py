@@ -230,6 +230,9 @@ class ProteinLandscape():
     def seed(self):
         return self.seed_seq
     
+    def num_sequences(self): 
+        return len(self)
+    
     def __str__(self):
         return f"""
         Protein Landscape class

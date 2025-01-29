@@ -2,6 +2,7 @@ import os
 import re
 import yaml
 import random
+import numpy as np
 
 from pscapes import ProteinLandscape
 
@@ -10,7 +11,26 @@ from pscapes import ProteinLandscape
 def make_landscape_data_dicts(
     data_dir: str,
     model_dir: str,
-    alphabet: str = 'ACDEFGHIKLMNPQRSTVWY'):
+    alphabet: str = 'ACDEFGHIKLMNPQRSTVWY', 
+    experimental: bool = False,
+    n_replicates: int = 4, 
+    random_seed: int = 1):
+
+    """
+    Function to parse hyperparameter and raw landscape data files into format suitable for extrapolation/ablation/
+    positional extrapolation functions. 
+
+    Args:
+        data_dir (str): directory where raw landscape data files are stored 
+        model_dir (str): directory where hyperparameter files are stores 
+        alphabet (str): the amino acid alphabet for this protein landscape 
+        seed_id (int):  index of the sequence you want to set as the seed sequence 
+
+    Returns: 
+        model_dict (dict): dictionary with model hyperaparameters 
+        data_dict (dict): dictionary of ProteinLandscape class objects 
+    
+    """
 
     # find yaml files in hparam dir
     hparam_set_files = os.listdir(model_dir)
@@ -43,15 +63,48 @@ def make_landscape_data_dicts(
 
         # get landscapes for each data file
 
+        if not experimental:         
 
-        landscape_dict = {
-            "r" + re.search(r'_r(\d+)', f).group(1): ProteinLandscape(
-                csv_path=data_dir + '/' + f,
-                amino_acids=alphabet
+            landscape_dict = {
+                "r" + re.search(r'_r(\d+)', f).group(1): ProteinLandscape(
+                    csv_path=data_dir + '/' + f,
+                    amino_acids=alphabet, 
+                )
+                for f in data_files
+                if f.startswith(landscape)
+            }
+        
+
+        # for experimental landscapes we have a different workflow for setting up the dict 
+        elif experimental: 
+
+            np.random.seed(random_seed)
+
+            filename = next((f for f in data_files if f.startswith(landscape)), None)
+            
+            assert filename != None, f'No filename found for the landscape {landscape}'
+            
+            #load a 'test' landscape to get indexes
+            test_landscape = ProteinLandscape(
+                csv_path=data_dir+ '/' + filename, 
+                amino_acids=alphabet) 
+            
+            n_sequences = test_landscape.num_sequences()
+            
+
+            r_seed_ids = np.random.randint(low=0, 
+                                           high=n_sequences-1,
+                                           size=n_replicates)
+            
+            landscape_dict = {f'r{r_index}': ProteinLandscape(
+                csv_path=data_dir + '/'+filename, 
+                amino_acids=alphabet, 
+                seed_id=r
             )
-            for f in data_files
-            if f.startswith(landscape)
-        }
+            for r_index, r in enumerate(r_seed_ids)
+            }
+
+# landscape dict {k1: {r1: ProteinLandscape(), r2: PL}, k2: }
 
  
 
