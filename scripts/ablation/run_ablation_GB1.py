@@ -25,7 +25,8 @@ def main():
         model_dir='./hyperopt/ohe/gb1_hparams/', 
         alphabet=ALPHABET, 
         experimental=True, 
-        n_replicates=4
+        n_replicates=N_REPLICATES,
+        random_seed=1
         )
     
 
@@ -46,7 +47,7 @@ def main():
     t2 = time.time()
     
     with open('./results/ablation_time_GB1.log', 'w') as file: 
-        file.write("Time taken: {} seconds".format(t2-t1))       
+        file.write(f"Time taken: {t2-t1} seconds")       
 
 
 if __name__ == "__main__": 
