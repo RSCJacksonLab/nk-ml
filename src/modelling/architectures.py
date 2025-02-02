@@ -183,9 +183,18 @@ class NeuralNetworkRegression(nn.Module):
         
 
         # get performance metrics
-        pearson_r, _ = pearsonr(all_preds.flatten(),
-                                all_targets.flatten())
-        pearson_r = pearson_r.item()
+
+        # can get an exception in pearson_r when the input array is constant.
+        # The below code block handles such exceptions
+        try: 
+            pearson_r, _ = pearsonr(all_preds.flatten(),
+                                    all_targets.flatten())
+            pearson_r = pearson_r.item()
+        except Exception as e:
+            print(f"An error occured: {e}")
+            pearson_r = np.nan
+            
+            
         r2 = r2_score(all_targets, all_preds)
         
 
