@@ -149,7 +149,6 @@ class ProteinLandscape():
         
         if saved_file is not None:
             try:
-                print(saved_file.suffix)
                 self.load(saved_file)
             except:
                 e = "File could not be loaded."
@@ -185,7 +184,6 @@ class ProteinLandscape():
         if seed_seq:
             self.seed_seq = seed_seq
         else:
-            self.seed_seq = seed_id
             self.seed_seq = self.sequences[seed_id]
 
         seq_len = len(self.seed_seq)
