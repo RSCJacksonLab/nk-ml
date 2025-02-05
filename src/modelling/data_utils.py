@@ -94,9 +94,9 @@ def score_sklearn_model(
     preds = sklearn_model.predict(x)
 
     # assess performance
-    mse = mean_squared_error(y, preds)
-    r2 = r2_score(y, preds)
-    corr = pearsonr(y, preds)[0]
+    mse = float(mean_squared_error(y, preds))
+    r2 = float(r2_score(y, preds))
+    corr = float(pearsonr(y, preds)[0])
 
 
     # result dict

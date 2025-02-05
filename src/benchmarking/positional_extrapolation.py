@@ -24,12 +24,8 @@ from typing import Optional
 
 from modelling import (
     architectures, 
-    collapse_concat, 
     make_dataset, 
     score_sklearn_model)
-
-def get_ohe_site
-
 
 def positional_extrapolation_test(model_dict: dict,
                                   landscape_dict: dict,
@@ -128,18 +124,18 @@ def positional_extrapolation_test(model_dict: dict,
                 wt_sequence = landscape_instance.seed_seq
 
                 # get all data for splitting
-                x_data = landscape_instance.ohe
+                x_data = np.stack(landscape_instance.ohe)
                 sequence_data = np.array([
                     list(seq) 
                     for seq in landscape_instance.sequences
                 ])
-                y_data = landscape_instance.fitnesses
+                y_data = landscape_instance.fitnesses.astype(np.float32)
 
                 # for each site with mutations present
                 for pos in positions:
 
-                    if not pos in results[instance]:
-                        results[instance][pos] = {}
+                    if not pos.item() in results[instance]:
+                        results[instance][pos.item()] = {}
 
                     # determine WT AA at site
                     wt_aa_at_pos = wt_sequence[pos]
@@ -150,7 +146,7 @@ def positional_extrapolation_test(model_dict: dict,
                     )
 
                     # get data with position fixed to WT
-                    trn_idx = np.where(sequence_data[:pos] == wt_aa_at_pos)
+                    trn_idx = np.where(sequence_data[:, pos] == wt_aa_at_pos)[0]
 
                     x_trn = x_data[trn_idx]
                     y_trn = y_data[trn_idx]
@@ -179,11 +175,11 @@ def positional_extrapolation_test(model_dict: dict,
                         score_train = loaded_model.score(
                             train_dloader
                         )
-                        results[instance][pos]["train"] = score_train
+                        results[instance][pos.item()]["train"] = score_train
 
                         for alt_aa in alt_aas_at_pos:
                             print(f'Testing {model_name} on {alt_aa} at site {pos}')
-                            test_idx = np.where(sequence_data[:pos] == alt_aa)
+                            test_idx = np.where(sequence_data[:, pos] == alt_aa)[0]
                             x_tst = x_data[test_idx]
                             y_tst = y_data[test_idx]
 
@@ -191,7 +187,7 @@ def positional_extrapolation_test(model_dict: dict,
                                 (x_tst, y_tst)
                             )
                             test_dloader = DataLoader(test_dset, batch_size=2048)
-                            results[instance][pos][alt_aa] = loaded_model.score(
+                            results[instance][pos.item()][alt_aa.item()] = loaded_model.score(
                                 test_dloader,
                             )
                     else:
@@ -228,10 +224,15 @@ def positional_extrapolation_test(model_dict: dict,
                         # train model
                         print('Fitting model')
                         loaded_model.fit(x_trn, y_trn)
+                        results[instance][pos.item()]["train"] = score_sklearn_model(
+                            loaded_model,
+                            x_trn,
+                            y_trn
+                        )
                         
                         for alt_aa in alt_aas_at_pos:
                             print(f'Testing {model_name} on {alt_aa} at site {pos}')
-                            test_idx = np.where(sequence_data[:pos] == alt_aa)
+                            test_idx = np.where(sequence_data[:, pos] == alt_aa)
                             x_tst = x_data[test_idx]
                             y_tst = y_data[test_idx]
 
@@ -246,12 +247,12 @@ def positional_extrapolation_test(model_dict: dict,
                             test_dset = make_dataset(
                                 (x_tst, y_tst)
                             )
-                            results[instance][pos][alt_aa] = score_sklearn_model(
+                            results[instance][pos.item()][alt_aa.item()] = score_sklearn_model(
                                 loaded_model,
                                 x_tst,
                                 y_tst
                             )
-        complete_results[model_name][landscape_name] = results
+            complete_results[model_name][landscape_name] = results
 
                 # # cross-fold eval
                 # for fold in range(cross_validation):
@@ -498,22 +499,20 @@ def positional_extrapolation_test(model_dict: dict,
         for model, landscapes in complete_results.items():
             for landscape, replicates in landscapes.items():
                 for replicate, positions in replicates.items():
-                    for pos, cv_folds in positions.items():
-                        for cv_fold, splits in cv_folds.items():
-                            for data_split, metrics in splits.items():
-                                # Append a row with the relevant data
-                                rows.append({
-                                    "model": model,
-                                    "landscape": landscape,
-                                    "replicate": replicate,
-                                    "train position": pos,
-                                    "cv_fold": cv_fold,
-                                    "data_split": data_split,
-                                    "pearson_r": metrics.get("pearson_r", None),
-                                    "r2": metrics.get("r2", None),
-                                    "mse_loss": metrics.get("mse_loss", None), 
-                                    "train_epochs": metrics.get("train_epochs", None)
-                                })
+                    for pos, splits in positions.items():
+                        for data_split, metrics in splits.items():
+                            # Append a row with the relevant data
+                            rows.append({
+                                "model": model,
+                                "landscape": landscape,
+                                "replicate": replicate,
+                                "train position": pos,
+                                "data_split": data_split,
+                                "pearson_r": metrics.get("pearson_r", None),
+                                "r2": metrics.get("r2", None),
+                                "mse_loss": metrics.get("mse_loss", None), 
+                                "train_epochs": metrics.get("train_epochs", None)
+                            })
 
         # Create a DataFrame from the rows
         df = pd.DataFrame(rows)
@@ -528,7 +527,7 @@ import os
 from benchmarking.file_proc import make_landscape_data_dicts
 
 # load yamls for hparams
-hopt_dir =  os.path.abspath("./hyperopt/results/nk_landscape/") # hyperparameter directory
+hopt_dir =  os.path.abspath("./hyperopt/ohe/nk_landscape_hparams") # hyperparameter directory
 data_dir =  os.path.abspath("./data/nk_landscapes/") # data directory with NK landscape data
 
 
