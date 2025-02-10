@@ -16,6 +16,7 @@ from typing import List, Literal, Optional, Tuple
 from modelling.data_utils import make_dataset
 from modelling.ml_utils import train_model
 
+import time
 
 class NeuralNetworkRegression(nn.Module):
     '''
@@ -88,11 +89,20 @@ class NeuralNetworkRegression(nn.Module):
         if val_data is not None:
             val_dset = make_dataset(val_data)
         else:
+            # implemented this method to catch val dsets with length 0
+            dset_size  = len(trn_dset)
+            train_size = int(0.8 * dset_size)  # 80% training
+            val_size   = dset_size - train_size # rest val 
+
             random_state = torch.Generator().manual_seed(0)
             trn_dset, val_dset = random_split(trn_dset, 
-                                              [0.8, 0.2], 
+                                              [train_size, val_size], 
                                               generator=random_state)
-        
+
+            assert len(val_dset) > 0, "Validation set size must be greater than 0"
+            assert len(trn_dset) > 0, "Training set size must be greater than 0"
+
+
         # make dataloaders
         trn_dloader = DataLoader(trn_dset, self.batch_size, shuffle=True)
         val_dloader = DataLoader(val_dset, self.batch_size, shuffle=False)
@@ -103,7 +113,7 @@ class NeuralNetworkRegression(nn.Module):
         optimizer = torch.optim.Adam(self.model.parameters(), 
                                      lr=self.lr)
         
-        model, trn_loss_ls, val_loss_ls = train_model(
+        model, trn_loss_ls, val_loss_ls, actual_epochs = train_model(
             self.model,
             optimizer,
             loss_fn,
@@ -116,16 +126,19 @@ class NeuralNetworkRegression(nn.Module):
         self.model = model
         self.trn_loss_ls = trn_loss_ls
         self.val_loss_ls = val_loss_ls
+        self.actual_epochs = actual_epochs
+        
 
-        # get full scoring for train and validation data
-        train_res = self.score(trn_dloader)
-        val_res = self.score(val_dloader)
+        # get full scoring for train and validation data -- commented out for efficiency
+        #train_res = self.score(trn_dloader)
+        #val_res = self.score(val_dloader)
 
-        return train_res, val_res
+        return trn_loss_ls, val_loss_ls
 
     def score(
         self,
-        dloader: DataLoader
+        dloader: DataLoader, 
+        batch: bool = False
     ) -> dict:
         '''
         Score model performance on provided data.
@@ -135,40 +148,60 @@ class NeuralNetworkRegression(nn.Module):
         dloader : Tuple[ArrayLike, ArrayLike]
             Data containing features (x) as first element and
             target (y) as second.
+
+        batch : uses batching to calculate the score. Useful if test set is large 
+                and won't fit into memory, but a lot slower. 
         '''
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
         
         self.model.to(device)
         self.model.eval()
 
+      
+
+
+        loss_fn = nn.MSELoss()
         total_loss = 0
         all_preds = []
-        all_targets = []
-        
+        all_targets = []        
         # get loss + predictions 
-        loss_fn = nn.MSELoss()
+        t1 = time.time()
         with torch.no_grad():
             for inputs, targets in dloader:
                 inputs, targets = inputs.to(device), targets.to(device)
                 outputs = self.model(inputs)
-                loss = loss_fn(outputs, targets)
+                loss = loss_fn(outputs, targets.unsqueeze(-1))
                 total_loss += loss.item()
                 all_preds.append(outputs.cpu().numpy())
                 all_targets.append(targets.cpu().numpy())
 
         all_preds = np.concatenate(all_preds, axis=0)
         all_targets = np.concatenate(all_targets, axis=0)
+        avg_loss = total_loss / len(dloader)
+        t2 = time.time()
+        print(f"Scoring time taken is {t2-t1}")
+        
 
         # get performance metrics
-        pearson_r, _ = pearsonr(all_preds.flatten(),
-                                all_targets.flatten())
+
+        # can get an exception in pearson_r when the input array is constant.
+        # The below code block handles such exceptions
+        try: 
+            pearson_r, _ = pearsonr(all_preds.flatten(),
+                                    all_targets.flatten())
+            pearson_r = pearson_r.item()
+        except Exception as e:
+            print(f"An error occured: {e}")
+            pearson_r = np.nan
+            
+            
         r2 = r2_score(all_targets, all_preds)
-        avg_loss = total_loss / len(dloader)
+        
 
         return {
             'pearson_r': pearson_r,
             'r2': r2,
-            'loss': avg_loss
+            'mse_loss': avg_loss
         }
 
 class SequenceRegressionLinear(nn.Module): 
@@ -183,9 +216,9 @@ class SequenceRegressionLinear(nn.Module):
     sequence_length: int, default=10
         Length of the input sequence. 
     '''
-    def __init__(self, alphabet_size: int = 5, sequence_length: int = 10):
+    def __init__(self, input_dim: int = 5, sequence_length: int = 10):
         super(SequenceRegressionLinear, self).__init__()
-        self.alphabet_size   = alphabet_size
+        self.alphabet_size = input_dim
         self.sequence_length = sequence_length
         input_size = self.alphabet_size * self.sequence_length
         self.linear = nn.Linear(input_size, 1)
@@ -215,14 +248,14 @@ class SequenceRegressionMLP(nn.Module):
         List of hidden layer sizes.
     '''
     def __init__(self, 
-                 alphabet_size: int = 5,
+                 input_dim: int = 5,
                  sequence_length: int = 10,
                  hidden_sizes: list = [128,64]):
         super(SequenceRegressionMLP, self).__init__()
-        self.alphabet_size = alphabet_size
+        self.input_dim = input_dim
         self.sequence_length = sequence_length
 
-        input_size = alphabet_size * sequence_length
+        input_size = input_dim * sequence_length
         self.fc_layers = nn.ModuleList()
         for i in range(len(hidden_sizes)):
             fc_layer = nn.Linear(input_size, hidden_sizes[i])
@@ -242,7 +275,7 @@ class SequenceRegressionMLP(nn.Module):
 
 class SequenceRegressionCNN(nn.Module):
     def __init__(self, 
-                 input_channels: int = 20, 
+                 input_dim: int = 20, 
                  sequence_length: int = 50, 
                  num_conv_layers: int = 2, 
                  n_kernels: List[int] = [64, 128], 
@@ -254,7 +287,7 @@ class SequenceRegressionCNN(nn.Module):
 
         Parameters:
         -----------
-        input_channels: int, default=20
+        input_dim: int, default=20
             Number of input channels, e.g., 20 for one-hot encoded
             amino acids.
 
@@ -283,7 +316,7 @@ class SequenceRegressionCNN(nn.Module):
 
         # Create convolutional layers dynamically
         self.conv_layers = nn.ModuleList()
-        in_channels = input_channels
+        in_channels = input_dim
         
         for i in range(num_conv_layers):
             conv_layer = nn.Conv1d(in_channels=in_channels,
@@ -302,7 +335,7 @@ class SequenceRegressionCNN(nn.Module):
         # Determine the flattened size by passing a dummy input
         with torch.no_grad():
             # (batch_size, input_channels, sequence_length)
-            dummy_input = torch.randn(1, input_channels, sequence_length)
+            dummy_input = torch.randn(1, input_dim, sequence_length)
             for i, conv_layer in enumerate(self.conv_layers):
                 dummy_input = torch.relu(conv_layer(dummy_input))
                 if (i + 1) % pool_every == 0:
@@ -347,7 +380,7 @@ class SequenceRegressionLSTM(nn.Module):
         If True, make the LSTM bidirectional.
     '''
     def __init__(self, 
-                 input_size: int = 20,
+                 input_dim: int = 20,
                  hidden_size: int = 128, 
                  num_layers: int = 2, 
                  bidirectional: bool = False):
@@ -360,7 +393,7 @@ class SequenceRegressionLSTM(nn.Module):
 
         # Define the LSTM layer
         self.lstm = nn.LSTM(
-            input_size=input_size,
+            input_size=input_dim,
             hidden_size=hidden_size,
             num_layers=num_layers,
             batch_first=True,

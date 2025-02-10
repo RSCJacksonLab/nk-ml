@@ -38,14 +38,10 @@ def main():
     model_names = list(model_names)
     model_class = list(model_class)
     model_hparams = [hparam_space_GB1.get(name) for name in model_names]
-    
-    
-
-
 
     # get data
     landscape = ProteinLandscape(
-        csv_path=f'../data/experimental_datasets/G_prot_4_mut_seq_space_only.csv',
+        csv_path=f'./data/experimental_datasets/gb1.csv',
         amino_acids=AA_ALPHABET
     )
     ohe = landscape.ohe
@@ -56,8 +52,6 @@ def main():
         test_size=round(len(y)*0.2),
         random_state=0
     )
-
-
     # commence study for landscape
     print(
         f"Commencing studies for landscape GB1"
@@ -65,6 +59,8 @@ def main():
 
     # tune for each model
     for idx, model_name in enumerate(model_names):
+        if not model_name.endswith("lstm"):
+            continue
         print(f"Optimising model: {model_name} for GB1")
         study = opt.create_study(direction='minimize')
         if model_name in ['RF', 'GB']:
@@ -91,9 +87,6 @@ def main():
             n_trials = len(model_hparams[idx]) * N_TRIALS_MULTIPLIER
         
             # optimisation
-            
-
-            
             study.optimize(
                 lambda trial: objective_fn(
                     trial,
@@ -112,13 +105,9 @@ def main():
             )
         model_hparam_dict = get_model_hparams(model_name, 
                                             study.best_params)
-        
-        
 
         output_dir = os.path.abspath(
             "../hyperopt/results/GB1_landscape_model_hparams/")
-
-        
 
         output_path_yaml   = output_dir + f"/{model_name}_GB1.yaml"
         output_path_pickle = output_dir + f"/{model_name}_GB1.pkl"

@@ -202,6 +202,8 @@ def train_model(model: nn.Module,
 
     assert n_epochs>0, 'n_epochs not strictly greater than 0, ensure n_epochs > 0'
     
+    actual_epochs = 0
+
     for epoch in range(n_epochs):
         model.train()  # Training mode
         
@@ -211,7 +213,7 @@ def train_model(model: nn.Module,
             
             optimizer.zero_grad()
             y_pred = model(x_batch)
-            loss = loss_fn(y_pred, y_batch)
+            loss = loss_fn(y_pred, y_batch.unsqueeze(-1))
             loss.backward()
             optimizer.step()
             
@@ -230,15 +232,17 @@ def train_model(model: nn.Module,
                 inputs, targets = inputs.to(device), targets.to(device)
                 
                 outputs = model(inputs)
-                loss = loss_fn(outputs, targets)
+                loss = loss_fn(outputs, targets.unsqueeze(-1))
                 val_loss += loss.item()
         val_loss /= len(val_loader)
         val_epoch_losses.append(val_loss)
 
         print(
-            f"Epoch [{epoch+1}/{n_epochs}], Train Loss: {train_loss:.4f}, "
-            f"Val Loss: {val_loss:.4f}"
+            f"Epoch [{epoch+1}/{n_epochs}], Train Loss: {train_loss}, "
+            f"Val Loss: {val_loss}"
         )
+        actual_epochs += 1
+
 
         # Check early stopping
         early_stopping(val_loss, model)
@@ -249,12 +253,12 @@ def train_model(model: nn.Module,
     # Load the best model after early stopping
     model.load_state_dict(torch.load(early_stopping.path))
 
-    # delete best model from early stopiig from disk 
+    # delete best model from early stoping from disk 
     if os.path.exists(early_stopping.path):
       os.remove(early_stopping.path)
     else:
       print("The file does not exist")
-    return model, train_epoch_losses, val_epoch_losses
+    return model, train_epoch_losses, val_epoch_losses, actual_epochs
 
 
 def get_trainable_params(model: nn.Module): 

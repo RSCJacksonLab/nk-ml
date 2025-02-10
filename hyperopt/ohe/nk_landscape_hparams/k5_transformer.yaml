@@ -1,0 +1,5 @@
+d_model: 64
+dim_feedforward: 32
+max_seq_length: 6
+nhead: 1
+num_layers: 2

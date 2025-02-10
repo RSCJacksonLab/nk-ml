@@ -241,7 +241,7 @@ def objective_fn(trial: opt.Trial,
     if model_name=='linear':
         model_instance = NeuralNetworkRegression(
             'linear',
-            **{'alphabet_size': alphabet_len, 
+            **{'input_dim': alphabet_len, 
                'sequence_length': sequence_len,
                'lr': lr,
                'batch_size': batch_size},
@@ -260,7 +260,7 @@ def objective_fn(trial: opt.Trial,
         ]
         model_instance= NeuralNetworkRegression(
             'mlp',
-            **{'alphabet_size': alphabet_len, 
+            **{'input_dim': alphabet_len, 
                'sequence_length': sequence_len,
                'hidden_sizes': hidden_sizes,
                'lr': lr,
@@ -285,7 +285,7 @@ def objective_fn(trial: opt.Trial,
         ]
         model_instance = NeuralNetworkRegression(
             'cnn',
-            **{'input_channels': alphabet_len, 
+            **{'input_dim': alphabet_len, 
                'sequence_length': sequence_len,
                'num_conv_layers': num_conv_layers,
                'n_kernels': n_kernels,
@@ -301,7 +301,7 @@ def objective_fn(trial: opt.Trial,
                                                 search_space['hidden_sizes'])
         model_instance = NeuralNetworkRegression(
                             'ulstm',
-                            **{'input_size': alphabet_len, 
+                            **{'input_dim': alphabet_len, 
                             'hidden_size': hidden_size,
                             'num_layers': num_layers,
                             'bidirectional': False,
@@ -316,7 +316,7 @@ def objective_fn(trial: opt.Trial,
                                                 search_space['hidden_sizes'])
         model_instance = NeuralNetworkRegression(
                             'blstm',
-                            **{'input_size': alphabet_len, 
+                            **{'input_dim': alphabet_len, 
                             'hidden_size': hidden_size,
                             'num_layers': num_layers,
                             'bidirectional': True,
