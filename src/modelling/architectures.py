@@ -134,31 +134,24 @@ class NeuralNetworkRegression(nn.Module):
         #val_res = self.score(val_dloader)
 
         return trn_loss_ls, val_loss_ls
-
-    def score(
+    
+    def predict(
         self,
-        dloader: DataLoader, 
-        batch: bool = False
-    ) -> dict:
+        dloader,
+    ):
         '''
-        Score model performance on provided data.
+        Return the predictions of the model on provided data.
 
         Parameters:
         -----------
         dloader : Tuple[ArrayLike, ArrayLike]
             Data containing features (x) as first element and
             target (y) as second.
-
-        batch : uses batching to calculate the score. Useful if test set is large 
-                and won't fit into memory, but a lot slower. 
         '''
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
         
         self.model.to(device)
         self.model.eval()
-
-      
-
 
         loss_fn = nn.MSELoss()
         total_loss = 0
@@ -180,23 +173,43 @@ class NeuralNetworkRegression(nn.Module):
         avg_loss = total_loss / len(dloader)
         t2 = time.time()
         print(f"Scoring time taken is {t2-t1}")
-        
 
+        return all_preds, all_targets, avg_loss
+
+    def score(
+        self,
+        dloader: DataLoader, 
+        batch: bool = False
+    ) -> dict:
+        '''
+        Score model performance on provided data.
+
+        Parameters:
+        -----------
+        dloader : Tuple[ArrayLike, ArrayLike]
+            Data containing features (x) as first element and
+            target (y) as second.
+
+        batch : uses batching to calculate the score. Useful if test set is large 
+                and won't fit into memory, but a lot slower. 
+        '''
+
+        # make predictions
+        all_preds, all_targets, avg_loss = self.predict(dloader)
+        
         # get performance metrics
 
         # can get an exception in pearson_r when the input array is constant.
         # The below code block handles such exceptions
         try: 
-            pearson_r, _ = pearsonr(all_preds.flatten(),
+            pearson_r, _ = pearsonr(all_preds,
                                     all_targets.flatten())
             pearson_r = pearson_r.item()
         except Exception as e:
             print(f"An error occured: {e}")
             pearson_r = np.nan
-            
-            
+
         r2 = r2_score(all_targets, all_preds)
-        
 
         return {
             'pearson_r': pearson_r,
