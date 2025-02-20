@@ -21,19 +21,19 @@ from typing import List, Optional
 
 from modelling import architectures, make_dataset, score_sklearn_model
 
-def length_testing(model_dict: dict,
-                   landscape_dict: dict,
-                   alphabet_size: int,
-                   split: float = 0.8,
-                   cross_validation: int = 1,
-                   save: bool = True,
-                   amino_acids: str='ACDEFGHIKLMNPQRSTVWY',
-                   seq_lens: List[int] = [10, 50, 100, 200, 250, 500],
-                   file_name: Optional[str] = None,
-                   directory: str = "results/",
-                   n_epochs: int = 10, 
-                   patience: int = 5, 
-                   min_delta: float = 1e-5):
+def length_dependency_test(model_dict: dict,
+                           landscape_dict: dict,
+                           alphabet_size: int,
+                           split: float = 0.8,
+                           cross_validation: int = 1,
+                           save: bool = True,
+                           amino_acids: str='ACDEFGHIKLMNPQRSTVWY',
+                           seq_lens: List[int] = [10, 50, 100, 200, 250, 500],
+                           file_name: Optional[str] = None,
+                           directory: str = "results/",
+                           n_epochs: int = 10, 
+                           patience: int = 5, 
+                           min_delta: float = 1e-5):
     """
     Length testing function that takes a dictionary of models, a
     landscape dictionary, and a list of sequence lengths. It iterates 
@@ -134,7 +134,7 @@ def length_testing(model_dict: dict,
 
                         x_trn, y_trn, x_tst, y_tst = landscape_instance.return_lengthened_data(
                             length,
-                            AAs=amino_acids,
+                            amino_acids=amino_acids,
                             split=split,
                             random_state=fold
                         )
@@ -273,7 +273,7 @@ def length_testing(model_dict: dict,
                                     "data_split": data_split,
                                     "pearson_r": metrics.get("pearson_r", None),
                                     "r2": metrics.get("r2", None),
-                                    "mse": metrics.get("mse", None)
+                                    "mse": metrics.get("mse_loss", None)
                                 })
 
         # Create a DataFrame from the rows
