@@ -14,15 +14,18 @@ MIN_DELTA = 1e-5
 #extrapolation NK 
 def main(): 
     print('Loading data and hyperparameter optimisation.')
-    model_dict, data_dict = make_landscape_data_dicts(data_dir='./data/nk_landscapes/', 
-                                                      model_dir='./hyperopt/ohe/nk_landscape_hparams/', 
-                                                      alphabet=ALPHABET)
+    model_dict, data_dict = make_landscape_data_dicts(
+        data_dir='./data/nk_landscapes/', 
+        model_dir='./hyperopt/ohe/nk_landscape_hparams/', 
+        alphabet=ALPHABET
+        )
     
     
 
     small_dict = sub_dict(data_dict, 
-                          n_replicates=N_REPLICATES, 
-                          random_seed=1)
+        n_replicates=N_REPLICATES, 
+        random_seed=1
+        )
 
 
 
@@ -30,20 +33,31 @@ def main():
     t1 = time.time()
     extrapolation_results = positional_extrapolation_test(model_dict=model_dict, 
                                                             landscape_dict=small_dict, 
-                                                            sequence_len=6, 
+                                                            sequence_len=SEQ_LEN, 
                                                             alphabet_size=len(ALPHABET), 
-                                                            file_name='positional_extrapolation_results_NK',
+                                                            file_name='positional_extrapolation_results_NK_',
                                                             directory= './results/',
                                                             n_epochs=N_EPOCHS, 
                                                             patience=PATIENCE,
-                                                            min_delta=MIN_DELTA, 
-                                                            inclusive=False
+                                                            min_delta=MIN_DELTA
                                                             )
     t2 = time.time()
     
     with open('./results/positional_extrapolation_time.log', 'w') as file: 
         file.write(f"Time taken: {t2-t1} seconds")       
 
-
+    # run control
+    print('Training and testing models as controls.')
+    extrapolation_control_results = positional_extrapolation_test(model_dict=model_dict, 
+                                                            landscape_dict=small_dict, 
+                                                            sequence_len=SEQ_LEN, 
+                                                            alphabet_size=len(ALPHABET), 
+                                                            file_name='positional_extrapolation_results_NK_CONTROL_',
+                                                            directory= './results/',
+                                                            n_epochs=N_EPOCHS, 
+                                                            patience=PATIENCE,
+                                                            min_delta=MIN_DELTA,
+                                                            control_pct=0.6
+                                                            )
 if __name__ == "__main__": 
     main()

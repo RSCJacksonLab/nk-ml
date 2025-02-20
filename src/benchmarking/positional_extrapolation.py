@@ -18,7 +18,9 @@ import numpy as np
 import pandas as pd
 import pickle as pkl
 
+from scipy.stats import pearsonr
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
+from sklearn.metrics import r2_score
 from torch.utils.data import DataLoader
 from typing import Optional
 
@@ -33,13 +35,13 @@ def positional_extrapolation_test(model_dict: dict,
                                   alphabet_size: int,
                                   split: float = 0.8,
                                   cross_validation: int = 1,
+                                  control_pct: Optional[float] = None,
                                   save: bool = True,
                                   file_name: Optional[str] = None,
                                   directory: str = "results/", 
                                   n_epochs: int = 30, 
                                   patience: int = 5, 
-                                  min_delta: float = 1e-5, 
-                                  inclusive: bool = True):
+                                  min_delta: float = 1e-5, ):
     """
     Positional extrapolation function that takes a dictionary of models and a
     landscape dictionary and iterates over all models and landscapes,
@@ -68,6 +70,11 @@ def positional_extrapolation_test(model_dict: dict,
         The number of times to randomly resample the dataset, typically
         used with experimental datasets.
 
+    control_pct : float, default=None
+        If running a control, the percent of test data re-added into 
+        train for determination of effect prediction capabilities when 
+        interpolating.
+
     save : Bool, default=True
         Boolean value used to determine whether or not the file will be
         saved.
@@ -88,6 +95,10 @@ def positional_extrapolation_test(model_dict: dict,
         model: {key: 0 for key in landscape_dict.keys()} 
         for model in model_names
     }
+    effect_complete_results = {
+        model: {key: 0 for key in landscape_dict.keys()} 
+        for model in model_names
+    }
     # iterate over model types
     for model_name in model_names: 
         print(f'Working on model: {model_name}')
@@ -104,6 +115,7 @@ def positional_extrapolation_test(model_dict: dict,
             model_hparams["sequence_length"] = sequence_len
 
             results = {}
+            effect_results = {}
 
             # iterate over each instance of the landscape
             for idx, instance in enumerate(landscape_dict[landscape_name]):
@@ -115,6 +127,9 @@ def positional_extrapolation_test(model_dict: dict,
                 # update result dict
                 if not instance in results.keys():
                     results[instance] = {}
+
+                if not instance in effect_results.keys():
+                    effect_results[instance] = {}
 
                 landscape_instance = landscape_dict[landscape_name][instance]
 
@@ -134,8 +149,11 @@ def positional_extrapolation_test(model_dict: dict,
                 # for each site with mutations present
                 for pos in positions:
 
-                    if not pos.item() in results[instance]:
+                    if not pos.item() in results[instance].keys():
                         results[instance][pos.item()] = {}
+
+                    if not pos.item() in effect_results[instance].keys():
+                        effect_results[instance][pos.item()]  = {}
 
                     # determine WT AA at site
                     wt_aa_at_pos = wt_sequence[pos]
@@ -148,8 +166,23 @@ def positional_extrapolation_test(model_dict: dict,
                     # get data with position fixed to WT
                     trn_idx = np.where(sequence_data[:, pos] == wt_aa_at_pos)[0]
 
+                    # if control run - add some variants back in
+                    added_idx = np.array([])
+                    if control_pct:
+                        print('Note: This run is a control.')
+                        for alt_aa in alt_aas_at_pos:
+                            alt_idx = np.where(sequence_data[:, pos] == alt_aa)[0]
+                            alt_idx = np.random.choice(
+                                alt_idx, 
+                                size=int(len(alt_idx) * control_pct), 
+                                replace=False)
+                            added_idx = np.concatenate([added_idx, alt_idx])
+                        # add data back into train
+                        trn_idx = np.concatenate([added_idx, trn_idx]).astype(np.int32)
+
+                    # make training split
                     x_trn = x_data[trn_idx]
-                    y_trn = y_data[trn_idx]
+                    y_trn = y_data[trn_idx]  
 
                     # get models and train
                     if model_name not in ["gb", "rf"]:
@@ -179,7 +212,11 @@ def positional_extrapolation_test(model_dict: dict,
 
                         for alt_aa in alt_aas_at_pos:
                             print(f'Testing {model_name} on {alt_aa} at site {pos}')
+
                             test_idx = np.where(sequence_data[:, pos] == alt_aa)[0]
+                            # remove potential control re-added data
+                            test_idx = np.setdiff1d(test_idx, added_idx)
+                            sequence_tst = sequence_data[test_idx, :]
                             x_tst = x_data[test_idx]
                             y_tst = y_data[test_idx]
 
@@ -190,6 +227,42 @@ def positional_extrapolation_test(model_dict: dict,
                             results[instance][pos.item()][alt_aa.item()] = loaded_model.score(
                                 test_dloader,
                             )
+
+                            # get corresponding train data (i.e. data with the same context)
+                            comparison_seqs = sequence_tst.copy()
+                            comparison_seqs[:, pos] = wt_aa_at_pos
+                            comparison_idx = np.where(np.any(
+                                np.all(sequence_data[:, None, :] == comparison_seqs[None, :, :], axis=2), 
+                                axis=1
+                            ))[0]
+                            x_comparison = x_data[comparison_idx]
+                            y_comparison = y_data[comparison_idx]
+
+                            comparison_dset = make_dataset(
+                                (x_comparison, y_comparison)
+                            )
+                            comparison_dloader = DataLoader(comparison_dset, 
+                                                            batch_size=2048)
+                            
+                            # get predictions
+                            tst_preds, _, _ = loaded_model.predict(test_dloader)
+                            comparison_preds, _, _ = loaded_model.predict(comparison_dloader)
+                            
+                            # get effects
+                            true_effect = (y_comparison - y_tst).flatten()
+                            pred_effect = (comparison_preds - tst_preds).flatten()
+                            
+                            # score ability to predict effect
+                            mae = np.mean(np.abs(true_effect - pred_effect))
+                            pearson_r, _ = pearsonr(true_effect, pred_effect)
+                            r2 = r2_score(true_effect, pred_effect)
+
+                            effect_results[instance][pos.item()][alt_aa.item()] = {
+                                'pearson_r': pearson_r.item(),
+                                'r2': r2,
+                                'mean_absolute_error': mae
+                            }
+
                     else:
                         # flatten input data
                         x_trn = [
@@ -233,6 +306,9 @@ def positional_extrapolation_test(model_dict: dict,
                         for alt_aa in alt_aas_at_pos:
                             print(f'Testing {model_name} on {alt_aa} at site {pos}')
                             test_idx = np.where(sequence_data[:, pos] == alt_aa)
+                            # remove control train data from test
+                            test_idx = np.setdiff1d(test_idx, added_idx)
+                            sequence_tst = sequence_data[test_idx, :]
                             x_tst = x_data[test_idx]
                             y_tst = y_data[test_idx]
 
@@ -244,304 +320,113 @@ def positional_extrapolation_test(model_dict: dict,
                                 x_tst, 
                                 axis=1
                             ).T
-                            test_dset = make_dataset(
-                                (x_tst, y_tst)
-                            )
                             results[instance][pos.item()][alt_aa.item()] = score_sklearn_model(
                                 loaded_model,
                                 x_tst,
                                 y_tst
                             )
+
+                            # get corresponding train data (i.e. data with the same context)
+                            comparison_seqs = sequence_tst.copy()
+                            comparison_seqs[:, pos] = wt_aa_at_pos
+                            comparison_idx = np.where(np.any(
+                                np.all(sequence_data[:, None, :] == comparison_seqs[None, :, :], axis=2), 
+                                axis=1
+                            ))[0]
+                            x_comparison = x_data[comparison_idx]
+                            y_comparison = y_data[comparison_idx]
+                            
+                            x_comparison = [
+                                i.flatten().reshape(-1, 1) 
+                                for i in x_comparison
+                                ]
+                            x_comparison = np.concatenate(
+                                x_comparison, 
+                                axis=1
+                            ).T
+
+                            # get predictions
+                            tst_preds = loaded_model.predict(x_tst)
+                            comparison_preds = loaded_model.predict(x_comparison)
+                            
+                            # get effects
+                            true_effect = (y_comparison - y_tst).flatten()
+                            pred_effect = (comparison_preds - tst_preds).flatten()
+                            
+                            # score ability to predict effect
+                            mae = np.mean(np.abs(true_effect - pred_effect)).item()
+                            pearson_r, _ = pearsonr(true_effect, pred_effect)
+                            r2 = r2_score(true_effect, pred_effect)
+
+                            effect_results[instance][pos.item()][alt_aa.item()] = {
+                                'pearson_r': pearson_r.item(),
+                                'r2': r2,
+                                'mean_absolute_error': mae
+                            }
+
             complete_results[model_name][landscape_name] = results
-
-                # # cross-fold eval
-                # for fold in range(cross_validation):
-
-                #     train_datasets = []
-                #     test_datasets = []
-
-                #     # for each position make test/train splits
-                #     for pos_idx in range(len(positions)):
-
-                #         actual_pos = int(positions[pos_idx])
-
-                #         if not pos_idx in results[instance].keys():
-                #             results[instance][actual_pos] = {}
-
-                #         if not fold in results[instance][actual_pos].keys():
-                #             results[instance][actual_pos][fold] = {}
-                        
-
-                #         x_trn, y_trn, x_tst, y_tst = landscape_instance.sklearn_data(
-                #             split=split,
-                #             positions=positions[:pos_idx + 1], 
-                #             random_state=fold,
-                #             convert_to_ohe=True, 
-                #             flatten_ohe=False
-                #         )
-                #         train_datasets.append([x_trn, y_trn])
-                #         test_datasets.append([x_tst, y_tst])
-
-                #     #this loop segregates the test data so x_p3 ONLY includes positions varying at 3 pso
-                #     if not inclusive:                         
-                #         exclusive_trn_dsets = [] #non-inclusive train datasets
-                        
-                #         for j_pos_idx, j_pos_tst_dset in enumerate(test_datasets): 
-                #             #pos_x_tst = j_pos_dset[0]
-                            
-                #             if j_pos_idx>0:
-                #                 x_tst_prev_all = [i[0] for i in exclusive_trn_dsets]
-                #                 x_tst_prev_all = [i for j in x_tst_prev_all for i in j]
-                                
-                #                 x_tst_current = [i for i in j_pos_tst_dset[0]]
-                #                 y_tst_current = j_pos_tst_dset[1]
-                
-                #                 #find indices of the current position trn_dset that are not in the previous position trn_dset
-                #                 indices = [i for i, arr2 in enumerate(x_tst_current) if 
-                #                            not any(np.array_equal(arr2, arr1) for arr1 in x_tst_prev_all)]
-                                
-                #                 x_tst_current_exclusive = j_pos_tst_dset[0][indices]
-                #                 y_tst_current_exclusive = j_pos_tst_dset[1][indices]
-                #                 continue                                
-
-                #             else: 
-                #                 exclusive_trn_dsets.append(j_pos_tst_dset)
-                                
-                            
-
-
-
-                    # train_datasets are composed [[x_p1, y_p1],[x_p2, y_p2], ..., n_positions],
-                    # where x_p1 is a list of np arrays consisting of train examples from only 
-                    # the first position mutated, x_p2 the first AND second positions mutated, and so on
-                    # 
-                    # test_datasets are composed [[x_p1, y_p1],[x_p2, y_p2], ..., n_positions],
-                    # where x_p1 is a list of np arrays consisting of test examples from only 
-                    # the first position mutated, x_p2 the first AND second positions mutated, and so on
-                    #
-                    # A 80/20 train/test ratio is used at each mutational position by default (can be changed). 
-                    # Train and test datasets are inclusive of the 'seed' sequence. 
-                    #
-                    # in the below train/test loop, models are iteratively trained on each element
-                    # of train_datasets i.e. on [x_p1, y_p1], [xp2, y_p2]..etc BUT tested on EVERY
-                    # element on test_datasets in each loop, permitting testing of positional 
-                    # extrapolation 
-
-            #         # for each test/train split - train and test models
-            #         for pos_idx in range(len(positions)):
-                        
-            #             actual_pos = int(positions[pos_idx]) #get the actual position 
-                        
-            #             pos_idx += 1 # add 1 for python list slicing below
-            #                          # so, for pos_idx 0, the below slice will include the value at 0th index
-            #             x_training = collapse_concat(
-            #                 [x[0] for x in train_datasets[:pos_idx]]
-            #             )
-            #             y_training = collapse_concat(
-            #                 [x[1] for x in train_datasets[:pos_idx]]
-            #             )
-
-            #             if model_name not in ["gb", "rf", "linear", "mlp", 
-            #                                   "blstm", "ulstm", "transformer"]:
-
-            #                 loaded_model = architectures.NeuralNetworkRegression(
-            #                     model_name,
-            #                     **model_hparams
-            #                 )
-
-
-            #                 # train model
-            #                 loaded_model.fit((x_training, 
-            #                                  y_training), 
-            #                                  n_epochs=n_epochs, 
-            #                                  patience=patience, 
-            #                                  min_delta=min_delta)
-            #                 print(
-            #                     f"{model_name} trained on dataset "
-            #                     f"{landscape_name} positions "
-            #                     f"{positions[:pos_idx]}"
-            #                 )
-    
-            #                 # score model
-            #                 train_dset = make_dataset(
-            #                     (x_training, y_training)
-            #                 )
-            #                 train_dloader = DataLoader(train_dset, 
-            #                                            batch_size=2048)
-
-            #                 score_train = loaded_model.score(train_dloader)
-            #                 score_train["train_epochs"] = loaded_model.actual_epochs
-
-            #                 score = {
-            #                     'train': score_train,
-            #                 }
-            #                 # score on different distance test sets
-            #                 for t_pos_idx, pos_dset in enumerate(test_datasets):
-            #                     x_tst = pos_dset[0]
-            #                     y_tst = pos_dset[1]
-
-
-
-
-            #                     test_dset = make_dataset(
-            #                         (x_tst, y_tst)
-            #                     )
-            #                     test_dloader = DataLoader(test_dset, 
-            #                                               batch_size=2048)
-            #                     score_test = loaded_model.score(
-            #                         test_dloader,
-            #                     )
-
-            #                     print(f'Model {model_name} trained on pos {positions[:pos_idx]}')
-            #                     print('score on test position {positions[t_pos_idx]} is {score_test}')
-                                
-            #                     score[f"test_pos{positions[t_pos_idx]}"] = score_test
-
-
-            #             else:
-
-            #                 # flatten input data 
-            #                 x_training = [
-            #                     i.flatten().reshape(-1, 1) 
-            #                     for i in x_training
-            #                     ]
-            #                 x_training = np.concatenate(
-            #                     x_training, 
-            #                     axis=1
-            #                 ).T
-
-            #                 # set model class
-            #                 if model_name == "rf":
-            #                     model_class = RandomForestRegressor
-
-            #                 elif model_name == "gb":
-            #                     model_class = GradientBoostingRegressor
-            #                 else:
-            #                     print(f"Model {model_name} not known.")
-            #                     continue
-                        
-            #                 # apply hyperparams 
-            #                 model_kwargs = inspect.signature(model_class)
-            #                 kwargs_filtered = {
-            #                     hparam: value 
-            #                     for hparam, value in model_hparams.items()
-            #                     if hparam in model_kwargs.parameters
-            #                 }
-
-            #                 if model_name == "rf": 
-            #                     kwargs_filtered['n_jobs']=-1
-                            
-            #                 #initialise model with hyperparams
-            #                 loaded_model = model_class(
-            #                     **kwargs_filtered
-            #                 )
-            #                 # train model on appropriate positional training data
-            #                 loaded_model.fit(x_training, y_training)
-
-            #                 print(
-            #                     f"{model_name} trained on dataset"
-            #                     f" {landscape_name} positions "
-            #                     f"{positions[:pos_idx]}."
-            #                 )
-
-            #                 # get model performance
-            #                 train_score = score_sklearn_model(
-            #                     loaded_model,
-            #                     x_training,
-            #                     y_training
-            #                 )
-            #                 score = {
-            #                     'train': train_score
-            #                 }
-                            
-            #                 # get model performance on data greater than distance
-            #                 for pos_idx, pos_dset in enumerate(test_datasets):
-            #                     x_tst = pos_dset[0]
-            #                     y_tst = pos_dset[1]
-
-            #                     # flatten x_test
-            #                     x_tst = [
-            #                         i.flatten().reshape(-1, 1) 
-            #                         for i in x_tst
-            #                         ]
-            #                     x_tst = np.concatenate(
-            #                         x_tst, 
-            #                         axis=1
-            #                     ).T  
-                                
-            #                     # make dataset and get performance
-            #                     score_test = score_sklearn_model(
-            #                         loaded_model,
-            #                         x_tst,
-            #                         y_tst,
-            #                     )
-            #                     print(f'Model {model_name} score on test position {positions[pos_idx]} is {score_test}')
-            #                     score[f"test_pos{positions[pos_idx]}"] = score_test
-
-            #             results[instance][actual_pos][fold] = score
-
-            # complete_results[model_name][landscape_name] = results
+            effect_complete_results[model_name][landscape_name] = effect_results
 
     if save:
         if not file_name:
             file_name = input(
                 "What name would you like to save results with?"
             )
-        file = open(directory + file_name + ".pkl", "wb")
-        pkl.dump(complete_results,file)
+        file = open(directory + file_name + "_Performance" + ".pkl", "wb")
+        pkl.dump(complete_results, file)
         file.close()
 
-# save csv
-        # Prepare a list to hold rows for the DataFrame
-        rows = []
+        file = open(directory + file_name + "_MutationalEffectPrediction" + ".pkl", "wb")
+        pkl.dump(effect_complete_results, file)
+        file.close()      
 
+        # save csv
+        # Prepare a list to hold rows for the DataFrame
+        training_rows = []
         # Iterate through the nested dictionary structure
         for model, landscapes in complete_results.items():
             for landscape, replicates in landscapes.items():
-                for replicate, positions in replicates.items():
-                    for pos, splits in positions.items():
+                for replicate, sites in replicates.items():
+                    for site, splits in sites.items():
                         for data_split, metrics in splits.items():
                             # Append a row with the relevant data
-                            rows.append({
+                            training_rows.append({
                                 "model": model,
                                 "landscape": landscape,
                                 "replicate": replicate,
-                                "train position": pos,
+                                "fixed_site": site,
                                 "data_split": data_split,
                                 "pearson_r": metrics.get("pearson_r", None),
                                 "r2": metrics.get("r2", None),
                                 "mse_loss": metrics.get("mse_loss", None), 
                                 "train_epochs": metrics.get("train_epochs", None)
                             })
-
         # Create a DataFrame from the rows
-        df = pd.DataFrame(rows)
-        df.to_csv(directory + file_name + ".csv", index=False)
+        df = pd.DataFrame(training_rows)
+        df.to_csv(directory + file_name + "_Performance" + ".csv", index=False)
+
+        # save csv
+        # Prepare a list to hold rows for the DataFrame
+        effect_rows = []
+        # Iterate through the nested dictionary structure
+        for model, landscapes in effect_complete_results.items():
+            for landscape, replicates in landscapes.items():
+                for replicate, sites in replicates.items():
+                    for site, amino_acids in sites.items():
+                        for aa, metrics in amino_acids.items():
+                            # Append a row with the relevant data
+                            effect_rows.append({
+                                "model": model,
+                                "landscape": landscape,
+                                "replicate": replicate,
+                                "fixed_site": site,
+                                "test_aa": aa,
+                                "pearson_r": metrics.get("pearson_r", None),
+                                "r2": metrics.get("r2", None),
+                                "mae": metrics.get("mean_absolute_error", None)
+                            })
+        # Create a DataFrame from the rows
+        df = pd.DataFrame(effect_rows)
+        df.to_csv(directory + file_name + "_MutationalEffectPrediction" + ".csv", index=False)
 
     return complete_results
-
-
-
-## debugging 
-# import os
-# from benchmarking.file_proc import make_landscape_data_dicts
-
-# # load yamls for hparams
-# hopt_dir =  os.path.abspath("./hyperopt/ohe/nk_landscape_hparams") # hyperparameter directory
-# data_dir =  os.path.abspath("./data/nk_landscapes/") # data directory with NK landscape data
-
-
-
-# model_dict, data_dict = make_landscape_data_dicts(
-#     data_dir,
-#     hopt_dir,
-#     alphabet='ACDEFG'
-# )
-
-# positional_extrapolation_test(model_dict=model_dict, 
-#                  landscape_dict=data_dict,
-#                  sequence_len=6,
-#                  alphabet_size=len("ACDEFG"),
-#                  split=0.8,
-#                  cross_validation=5,
-#                  )
