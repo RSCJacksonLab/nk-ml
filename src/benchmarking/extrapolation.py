@@ -155,7 +155,6 @@ def extrapolation_test(model_dict: dict,
                             [x[1] for x in train_datasets[:j]]
                         )
 
-
                         if model_name not in ["gb", "rf"]:
                             loaded_model = architectures.NeuralNetworkRegression(
                                 model_name,
@@ -327,26 +326,26 @@ def extrapolation_test(model_dict: dict,
 
 
 
-# ## debugging 
-# import os
-# from benchmarking.file_proc import make_landscape_data_dicts
+## debugging 
+import os
+from benchmarking.file_proc import make_landscape_data_dicts
 
-# # load yamls for hparams
-# hopt_dir =  os.path.abspath("./hyperopt/results/nk_landscape/") # hyperparameter directory
-# data_dir =  os.path.abspath("./data/nk_landscapes/") # data directory with NK landscape data
+# load yamls for hparams
+hopt_dir =  os.path.abspath("./hyperopt/ohe/nk_landscape_hparams/") # hyperparameter directory
+data_dir =  os.path.abspath("./data/nk_landscapes/") # data directory with NK landscape data
 
 
 
-# model_dict, data_dict = make_landscape_data_dicts(
-#     data_dir,
-#     hopt_dir,
-#     alphabet='ACDEFG'
-# )
+model_dict, data_dict = make_landscape_data_dicts(
+    data_dir,
+    hopt_dir,
+    alphabet='ACDEFG'
+)
 
-# extrapolation_test(model_dict=model_dict, 
-#                  landscape_dict=data_dict,
-#                  sequence_len=6,
-#                  alphabet_size=len("ACDEFG"),
-#                  split=0.8,
-#                  cross_validation=5,
-#                  )
+extrapolation_test(model_dict=model_dict, 
+                 landscape_dict=data_dict,
+                 sequence_len=6,
+                 alphabet_size=len("ACDEFG"),
+                 split=0.8,
+                 cross_validation=5,
+                 )
