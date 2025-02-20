@@ -15,8 +15,8 @@ MIN_DELTA = 1e-5
 def main(): 
     print('Loading data and hyperparameter optimisation.')
     model_dict, data_dict = make_landscape_data_dicts(
-        data_dir='../../data/nk_landscapes/', 
-        model_dir='../../hyperopt/ohe/nk_landscape_hparams/', 
+        data_dir='./data/nk_landscapes/', 
+        model_dir='./hyperopt/ohe/nk_landscape_hparams/', 
         alphabet=ALPHABET
         )
     
