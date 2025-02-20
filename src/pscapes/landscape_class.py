@@ -73,7 +73,6 @@ class ProteinLandscape():
         position is mutated relative to the seed sequence.
 
      mutated_positions: np.array(int)
-
         Numpy array that stores the integers of each position that is
         mutated.
 
@@ -97,7 +96,6 @@ class ProteinLandscape():
         Seed sequence as a string.
 
     tokenized : np.array, shape(N,L+1)
-
         Array containing each sequence with fitness appended onto the
         end. For the shape, N is the number of samples, and L is the
         length of the seed sequence
@@ -664,19 +662,21 @@ class ProteinLandscape():
 
     def return_lengthened_data(self,
                                seq_len: int, 
-                               AAs: Optional[str] = None, 
+                               amino_acids: Optional[str] = None, 
                                mut_indices: bool = False,
                                split: float = 0.8,
-                               shuffle: bool = True):
+                               shuffle: bool = True, 
+                               random_state: int = 0):
         '''
         Helper function that passes the result of lengthen sequences
         to sklearn_data. Argument signature is a combination of 
         self.lengthen_sequences and self.sklearn_data.
         '''
         return self.sklearn_data(
-            data=(self.lengthen_sequences(seq_len,AAs,mut_indices)),
+            data=(self.lengthen_sequences(seq_len, amino_acids, mut_indices)),
             split=split,
-            shuffle=shuffle
+            shuffle=shuffle,
+            random_state=random_state,
         )
 
     def save(self, name=None, ext=".txt"):
