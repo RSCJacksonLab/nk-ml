@@ -172,7 +172,7 @@ class NeuralNetworkRegression(nn.Module):
         all_targets = np.concatenate(all_targets, axis=0)
         avg_loss = total_loss / len(dloader)
         t2 = time.time()
-        print(f"Scoring time taken is {t2-t1}")
+        print(f"Prediction time taken is {t2-t1}")
 
         return all_preds, all_targets, avg_loss
 
