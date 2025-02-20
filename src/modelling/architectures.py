@@ -65,7 +65,7 @@ class NeuralNetworkRegression(nn.Module):
         val_data: Optional[Tuple[ArrayLike, ArrayLike]] = None,
         n_epochs: int = 30,
         patience: int = 5,
-        min_delta: int = 1e-5
+        min_delta: float = 1e-5
 ) -> Tuple[dict, dict]:
         '''
         Train model on provided data. Will make validation data

@@ -5,10 +5,15 @@ Based on distance from seed sequence, holdout distant sequences as a
 test set.
 
 Modification of code from https://github.com/acmater/NK_Benchmarking/
+* Added cross validation
+* Deterministic splits during cross-fold testing
+* Refactor for new models
 '''
 
-from tarfile import LENGTH_NAME
+import inspect
 import numpy as np
+import pandas as pd
+import pickle as pkl
 
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from torch.utils.data import DataLoader
@@ -25,7 +30,10 @@ def length_testing(model_dict: dict,
                    amino_acids: str='ACDEFGHIKLMNPQRSTVWY',
                    seq_lens: List[int] = [10, 50, 100, 200, 250, 500],
                    file_name: Optional[str] = None,
-                   directory: str = "r esults/"):
+                   directory: str = "results/",
+                   n_epochs: int = 10, 
+                   patience: int = 5, 
+                   min_delta: float = 1e-5):
     """
     Length testing function that takes a dictionary of models, a
     landscape dictionary, and a list of sequence lengths. It iterates 
@@ -113,12 +121,16 @@ def length_testing(model_dict: dict,
                 for fold in range(cross_validation):
 
                     print('Working on cross-validation fold: {}'.format(fold))
+                    if not fold in results[instance].keys():
+                        results[instance][fold] = {}
 
                     # Iterate over each INSTANCE of each landscape, 1 for experimental
                     for length in seq_lens:
 
                         # add sequence length hparam
                         model_hparams["sequence_length"] = length
+                        if not length in results[instance][fold].keys():
+                            results[instance][fold][length] = {}
 
                         x_trn, y_trn, x_tst, y_tst = landscape_instance.return_lengthened_data(
                             length,
@@ -138,8 +150,8 @@ def length_testing(model_dict: dict,
 
                             # train model and ablated data
                             print('Fitting model')
-                            loaded_model.fit((actual_x_train, 
-                                              actual_y_train),
+                            loaded_model.fit((x_trn, 
+                                              y_trn),
                                               n_epochs=n_epochs, 
                                               patience=patience,
                                               min_delta=min_delta)
@@ -147,7 +159,7 @@ def length_testing(model_dict: dict,
                             # score model
                             print('Scoring model')
                             train_dset = make_dataset(
-                                (actual_x_train, actual_y_train)
+                                (x_trn, y_trn)
                             )
                             train_dloader = DataLoader(train_dset, 
                                                        batch_size=2048)
@@ -164,16 +176,16 @@ def length_testing(model_dict: dict,
                             score = {
                                 'train': score_train,
                                 'test': score_test
-                                
                             }
+                            
                         else:
                             # flatten input data
-                            actual_x_train = [
+                            x_trn = [
                                 i.flatten().reshape(-1, 1) 
-                                for i in actual_x_train
+                                for i in x_trn
                                 ]
-                            actual_x_train = np.concatenate(
-                                actual_x_train, 
+                            x_trn = np.concatenate(
+                                x_trn, 
                                 axis=1
                             ).T
 
@@ -208,14 +220,14 @@ def length_testing(model_dict: dict,
                             )
                             # train model on ablated data
                             print('Fitting model')
-                            loaded_model.fit(actual_x_train, actual_y_train)
+                            loaded_model.fit(x_trn, y_trn)
 
                             # get model performance
                             print('Scoring model')                            
                             train_score = score_sklearn_model(
                                 loaded_model,
-                                actual_x_train,
-                                actual_y_train,
+                                x_trn,
+                                y_trn,
                             )
                             test_score = score_sklearn_model(
                                 loaded_model,
@@ -226,13 +238,46 @@ def length_testing(model_dict: dict,
                                 "train": train_score,
                                 "test": test_score
                             }
-            complete_results[model_type][name] = results
+                            
+                        results[instance][fold][length] = score
+                        
+            complete_results[model_name][landscape_name] = results
 
     if save:
         if not file_name:
-            file_name = input("What name would you like to save results with?")
+            file_name = input(
+                "What name would you like to save results with?"
+            )
         file = open(directory + file_name + ".pkl", "wb")
         pkl.dump(complete_results,file)
         file.close()
+
+        # save csv
+        # Prepare a list to hold rows for the DataFrame
+        rows = []
+
+        # Iterate through the nested dictionary structure
+        for model, landscapes in complete_results.items():
+            for landscape, replicates in landscapes.items():
+                for replicate, cv_folds in replicates.items():
+                    for cv_fold, seq_lengths in cv_folds.items():
+                        for seq_length, splits in seq_lengths.items(): 
+                            for data_split, metrics in splits.items():
+                                # Append a row with the relevant data
+                                rows.append({
+                                    "model": model,
+                                    "landscape": landscape,
+                                    "replicate": replicate,
+                                    "cv_fold": cv_fold,
+                                    "sequence_length": seq_length,
+                                    "data_split": data_split,
+                                    "pearson_r": metrics.get("pearson_r", None),
+                                    "r2": metrics.get("r2", None),
+                                    "mse": metrics.get("mse", None)
+                                })
+
+        # Create a DataFrame from the rows
+        df = pd.DataFrame(rows)
+        df.to_csv(directory + file_name + ".csv", index=False)
 
     return complete_results

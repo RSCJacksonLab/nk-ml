@@ -7,6 +7,7 @@ sequence than the training datapoint with the greatest distance.
 Modification of code from https://github.com/acmater/NK_Benchmarking/
 * Added cross-fold evaluation
 * Deterministic splits during cross-fold testing
+* Refactor for new models
 '''
 
 import inspect
