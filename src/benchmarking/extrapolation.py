@@ -323,29 +323,3 @@ def extrapolation_test(model_dict: dict,
         df.to_csv(directory + file_name + ".csv", index=False)
 
     return complete_results
-
-
-
-## debugging 
-import os
-from benchmarking.file_proc import make_landscape_data_dicts
-
-# load yamls for hparams
-hopt_dir =  os.path.abspath("./hyperopt/ohe/nk_landscape_hparams/") # hyperparameter directory
-data_dir =  os.path.abspath("./data/nk_landscapes/") # data directory with NK landscape data
-
-
-
-model_dict, data_dict = make_landscape_data_dicts(
-    data_dir,
-    hopt_dir,
-    alphabet='ACDEFG'
-)
-
-extrapolation_test(model_dict=model_dict, 
-                 landscape_dict=data_dict,
-                 sequence_len=6,
-                 alphabet_size=len("ACDEFG"),
-                 split=0.8,
-                 cross_validation=5,
-                 )
