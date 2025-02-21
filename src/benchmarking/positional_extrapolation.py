@@ -249,11 +249,11 @@ def positional_extrapolation_test(model_dict: dict,
                             comparison_preds, _, _ = loaded_model.predict(comparison_dloader)
                             
                             # get effects
-                            true_effect = (y_comparison - y_tst).flatten()
-                            pred_effect = (comparison_preds - tst_preds).flatten()
+                            true_effect = (y_comparison - y_tst)
+                            pred_effect = (comparison_preds - tst_preds).ravel()
                             
                             # score ability to predict effect
-                            mae = np.mean(np.abs(true_effect - pred_effect))
+                            mae = np.mean(np.abs(true_effect - pred_effect), dtype=np.float32).item()
                             pearson_r, _ = pearsonr(true_effect, pred_effect)
                             r2 = r2_score(true_effect, pred_effect)
 
@@ -313,7 +313,7 @@ def positional_extrapolation_test(model_dict: dict,
                             y_tst = y_data[test_idx]
 
                             x_tst = [
-                                i.flatten().reshape(-1, 1) 
+                                i.ravel().reshape(-1, 1) 
                                 for i in x_tst
                                 ]
                             x_tst = np.concatenate(
@@ -337,7 +337,7 @@ def positional_extrapolation_test(model_dict: dict,
                             y_comparison = y_data[comparison_idx]
                             
                             x_comparison = [
-                                i.flatten().reshape(-1, 1) 
+                                i.ravel().reshape(-1, 1) 
                                 for i in x_comparison
                                 ]
                             x_comparison = np.concatenate(
@@ -350,11 +350,11 @@ def positional_extrapolation_test(model_dict: dict,
                             comparison_preds = loaded_model.predict(x_comparison)
                             
                             # get effects
-                            true_effect = (y_comparison - y_tst).flatten()
-                            pred_effect = (comparison_preds - tst_preds).flatten()
+                            true_effect = (y_comparison - y_tst)
+                            pred_effect = (comparison_preds - tst_preds).ravel()
                             
                             # score ability to predict effect
-                            mae = np.mean(np.abs(true_effect - pred_effect)).item()
+                            mae = np.mean(np.abs(true_effect - pred_effect), dtype=np.float32).item()
                             pearson_r, _ = pearsonr(true_effect, pred_effect)
                             r2 = r2_score(true_effect, pred_effect)
 
