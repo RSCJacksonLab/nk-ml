@@ -7,17 +7,17 @@ import time
 ALPHABET = 'ACDEFGHIKLMNPQRSTVWY'
 SEQ_LEN  = 4
 N_REPLICATES = 4
-N_EPOCHS = 150
+N_EPOCHS = 1
 PATIENCE = 10
 MIN_DELTA = 1e-5
 
 #extrapolation NK 
 def main(): 
     import os
-    os.listdir('../../data/experimental_datasets/')
+    os.listdir('./data/experimental_datasets/')
     print('Loading data and hyperparameter optimisation.')
-    model_dict, data_dict = make_landscape_data_dicts(data_dir='../../data/experimental_datasets/', 
-                                                      model_dir='../../hyperopt/ohe/gb1_hparams/', 
+    model_dict, data_dict = make_landscape_data_dicts(data_dir='./data/experimental_datasets/', 
+                                                      model_dir='./hyperopt/ohe/gb1_hparams/', 
                                                       alphabet=ALPHABET,
                                                       experimental=True,
                                                       n_replicates=N_REPLICATES,

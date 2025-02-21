@@ -233,10 +233,20 @@ def positional_extrapolation_test(model_dict: dict,
                             # get corresponding train data (i.e. data with the same context)
                             comparison_seqs = sequence_tst.copy()
                             comparison_seqs[:, pos] = wt_aa_at_pos
-                            comparison_idx = np.where(np.any(
-                                np.all(sequence_data[:, None, :] == comparison_seqs[None, :, :], axis=2), 
-                                axis=1
-                            ))[0]
+                            
+                            seq_to_idx = {
+                                tuple(seq): i 
+                                for i, seq in enumerate(map(tuple, sequence_data))
+                            }
+                            comparison_idx = np.array(
+                                [seq_to_idx.get(tuple(seq), None) 
+                                for seq in map(tuple, comparison_seqs)],
+                                dtype=object
+                            )
+
+                            valid_mask = (comparison_idx != None).astype(bool)
+                            test_idx = test_idx[valid_mask].astype(np.int32)
+                            comparison_idx = comparison_idx[valid_mask].astype(np.int32)
                             x_comparison = x_data[comparison_idx]
                             y_comparison = y_data[comparison_idx]
 
@@ -248,6 +258,8 @@ def positional_extrapolation_test(model_dict: dict,
                             
                             # get predictions
                             tst_preds, _, _ = loaded_model.predict(test_dloader)
+                            tst_preds = tst_preds[valid_mask]
+                            y_tst = y_tst[valid_mask]
                             comparison_preds, _, _ = loaded_model.predict(comparison_dloader)
                             
                             # get effects
@@ -331,10 +343,20 @@ def positional_extrapolation_test(model_dict: dict,
                             # get corresponding train data (i.e. data with the same context)
                             comparison_seqs = sequence_tst.copy()
                             comparison_seqs[:, pos] = wt_aa_at_pos
-                            comparison_idx = np.where(np.any(
-                                np.all(sequence_data[:, None, :] == comparison_seqs[None, :, :], axis=2), 
-                                axis=1
-                            ))[0]
+                            
+                            seq_to_idx = {
+                                tuple(seq): i 
+                                for i, seq in enumerate(map(tuple, sequence_data))
+                            }
+                            comparison_idx = np.array(
+                                [seq_to_idx.get(tuple(seq), None) 
+                                for seq in map(tuple, comparison_seqs)],
+                                dtype=object
+                            )
+
+                            valid_mask = (comparison_idx != None).astype(bool)
+                            test_idx = test_idx[valid_mask].astype(np.int32)
+                            comparison_idx = comparison_idx[valid_mask].astype(np.int32)
                             x_comparison = x_data[comparison_idx]
                             y_comparison = y_data[comparison_idx]
                             
@@ -349,6 +371,8 @@ def positional_extrapolation_test(model_dict: dict,
 
                             # get predictions
                             tst_preds = loaded_model.predict(x_tst)
+                            tst_preds = tst_preds[valid_mask]
+                            y_tst = y_tst[valid_mask]
                             comparison_preds = loaded_model.predict(x_comparison)
                             
                             # get effects
