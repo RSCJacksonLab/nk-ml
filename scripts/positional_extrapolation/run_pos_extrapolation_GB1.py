@@ -14,10 +14,10 @@ MIN_DELTA = 1e-5
 #extrapolation NK 
 def main(): 
     import os
-    os.listdir('./data/experimental_datasets/')
+    os.listdir('../../data/experimental_datasets/')
     print('Loading data and hyperparameter optimisation.')
-    model_dict, data_dict = make_landscape_data_dicts(data_dir='./data/experimental_datasets/', 
-                                                      model_dir='./hyperopt/ohe/gb1_hparams/', 
+    model_dict, data_dict = make_landscape_data_dicts(data_dir='../../data/experimental_datasets/', 
+                                                      model_dir='../../hyperopt/ohe/gb1_hparams/', 
                                                       alphabet=ALPHABET,
                                                       experimental=True,
                                                       n_replicates=N_REPLICATES,
@@ -38,7 +38,7 @@ def main():
                                                             sequence_len=SEQ_LEN, 
                                                             alphabet_size=len(ALPHABET), 
                                                             file_name='positional_extrapolation_results_GB1',
-                                                            directory= './results/',
+                                                            directory= '../../results/',
                                                             n_epochs=N_EPOCHS, 
                                                             patience=PATIENCE,
                                                             min_delta=MIN_DELTA
@@ -55,7 +55,7 @@ def main():
                                                             sequence_len=SEQ_LEN, 
                                                             alphabet_size=len(ALPHABET), 
                                                             file_name='positional_extrapolation_results_GB1_CONTROL',
-                                                            directory= './results/',
+                                                            directory= '../../results/',
                                                             n_epochs=N_EPOCHS, 
                                                             patience=PATIENCE,
                                                             min_delta=MIN_DELTA,

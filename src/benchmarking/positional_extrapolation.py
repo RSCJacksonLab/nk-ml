@@ -191,7 +191,7 @@ def positional_extrapolation_test(model_dict: dict,
                             **model_hparams
                         )
                         # train model
-                        print('Fitting model')
+                        print(f'Fitting model {model_name}')
                         loaded_model.fit((x_trn,
                                           y_trn),
                                           n_epochs=n_epochs, 
@@ -207,7 +207,7 @@ def positional_extrapolation_test(model_dict: dict,
                         train_dloader = DataLoader(train_dset, batch_size=2048)
                         score_train = loaded_model.score(
                             train_dloader
-                        )
+                        )                        
                         results[instance][pos.item()]["train"] = score_train
 
                         for alt_aa in alt_aas_at_pos:
@@ -224,6 +224,8 @@ def positional_extrapolation_test(model_dict: dict,
                                 (x_tst, y_tst)
                             )
                             test_dloader = DataLoader(test_dset, batch_size=2048)
+
+                            print(f'Scoring on test for {alt_aa} at {pos}')
                             results[instance][pos.item()][alt_aa.item()] = loaded_model.score(
                                 test_dloader,
                             )
