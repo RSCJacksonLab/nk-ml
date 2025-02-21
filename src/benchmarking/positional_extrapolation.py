@@ -172,9 +172,13 @@ def positional_extrapolation_test(model_dict: dict,
                         print('Note: This run is a control.')
                         for alt_aa in alt_aas_at_pos:
                             alt_idx = np.where(sequence_data[:, pos] == alt_aa)[0]
-                            added_idx = np.stack([added_idx, alt_idx])
+                            alt_idx = np.random.choice(
+                                alt_idx, 
+                                size=int(len(alt_idx) * control_pct), 
+                                replace=False)
+                            added_idx = np.concatenate([added_idx, alt_idx])
                         # add data back into train
-                        trn_idx = np.stack([added_idx, trn_idx])
+                        trn_idx = np.concatenate([added_idx, trn_idx]).astype(np.int32)
 
                     # make training split
                     x_trn = x_data[trn_idx]
@@ -187,7 +191,7 @@ def positional_extrapolation_test(model_dict: dict,
                             **model_hparams
                         )
                         # train model
-                        print('Fitting model')
+                        print(f'Fitting model {model_name}')
                         loaded_model.fit((x_trn,
                                           y_trn),
                                           n_epochs=n_epochs, 
@@ -203,7 +207,7 @@ def positional_extrapolation_test(model_dict: dict,
                         train_dloader = DataLoader(train_dset, batch_size=2048)
                         score_train = loaded_model.score(
                             train_dloader
-                        )
+                        )                        
                         results[instance][pos.item()]["train"] = score_train
 
                         for alt_aa in alt_aas_at_pos:
@@ -220,6 +224,8 @@ def positional_extrapolation_test(model_dict: dict,
                                 (x_tst, y_tst)
                             )
                             test_dloader = DataLoader(test_dset, batch_size=2048)
+
+                            print(f'Scoring on test for {alt_aa} at {pos}')
                             results[instance][pos.item()][alt_aa.item()] = loaded_model.score(
                                 test_dloader,
                             )
@@ -227,7 +233,20 @@ def positional_extrapolation_test(model_dict: dict,
                             # get corresponding train data (i.e. data with the same context)
                             comparison_seqs = sequence_tst.copy()
                             comparison_seqs[:, pos] = wt_aa_at_pos
-                            comparison_idx = np.where(sequence_data=comparison_seqs)
+                            
+                            seq_to_idx = {
+                                tuple(seq): i 
+                                for i, seq in enumerate(map(tuple, sequence_data))
+                            }
+                            comparison_idx = np.array(
+                                [seq_to_idx.get(tuple(seq), None) 
+                                for seq in map(tuple, comparison_seqs)],
+                                dtype=object
+                            )
+
+                            valid_mask = (comparison_idx != None).astype(bool)
+                            test_idx = test_idx[valid_mask].astype(np.int32)
+                            comparison_idx = comparison_idx[valid_mask].astype(np.int32)
                             x_comparison = x_data[comparison_idx]
                             y_comparison = y_data[comparison_idx]
 
@@ -239,19 +258,21 @@ def positional_extrapolation_test(model_dict: dict,
                             
                             # get predictions
                             tst_preds, _, _ = loaded_model.predict(test_dloader)
+                            tst_preds = tst_preds[valid_mask]
+                            y_tst = y_tst[valid_mask]
                             comparison_preds, _, _ = loaded_model.predict(comparison_dloader)
                             
                             # get effects
-                            true_effect = y_comparison - y_tst
-                            pred_effect = comparison_preds - tst_preds
+                            true_effect = (y_comparison - y_tst)
+                            pred_effect = (comparison_preds - tst_preds).ravel()
                             
                             # score ability to predict effect
-                            mae = np.mean(np.abs(true_effect - pred_effect))
-                            pearson_r = pearsonr(true_effect, pred_effect)
+                            mae = np.mean(np.abs(true_effect - pred_effect), dtype=np.float32).item()
+                            pearson_r, _ = pearsonr(true_effect, pred_effect)
                             r2 = r2_score(true_effect, pred_effect)
 
                             effect_results[instance][pos.item()][alt_aa.item()] = {
-                                'pearson_r': pearson_r,
+                                'pearson_r': pearson_r.item(),
                                 'r2': r2,
                                 'mean_absolute_error': mae
                             }
@@ -306,7 +327,7 @@ def positional_extrapolation_test(model_dict: dict,
                             y_tst = y_data[test_idx]
 
                             x_tst = [
-                                i.flatten().reshape(-1, 1) 
+                                i.ravel().reshape(-1, 1) 
                                 for i in x_tst
                                 ]
                             x_tst = np.concatenate(
@@ -322,12 +343,25 @@ def positional_extrapolation_test(model_dict: dict,
                             # get corresponding train data (i.e. data with the same context)
                             comparison_seqs = sequence_tst.copy()
                             comparison_seqs[:, pos] = wt_aa_at_pos
-                            comparison_idx = np.where(sequence_data=comparison_seqs)
+                            
+                            seq_to_idx = {
+                                tuple(seq): i 
+                                for i, seq in enumerate(map(tuple, sequence_data))
+                            }
+                            comparison_idx = np.array(
+                                [seq_to_idx.get(tuple(seq), None) 
+                                for seq in map(tuple, comparison_seqs)],
+                                dtype=object
+                            )
+
+                            valid_mask = (comparison_idx != None).astype(bool)
+                            test_idx = test_idx[valid_mask].astype(np.int32)
+                            comparison_idx = comparison_idx[valid_mask].astype(np.int32)
                             x_comparison = x_data[comparison_idx]
                             y_comparison = y_data[comparison_idx]
                             
                             x_comparison = [
-                                i.flatten().reshape(-1, 1) 
+                                i.ravel().reshape(-1, 1) 
                                 for i in x_comparison
                                 ]
                             x_comparison = np.concatenate(
@@ -337,19 +371,21 @@ def positional_extrapolation_test(model_dict: dict,
 
                             # get predictions
                             tst_preds = loaded_model.predict(x_tst)
+                            tst_preds = tst_preds[valid_mask]
+                            y_tst = y_tst[valid_mask]
                             comparison_preds = loaded_model.predict(x_comparison)
                             
                             # get effects
-                            true_effect = y_comparison - y_tst
-                            pred_effect = comparison_preds - tst_preds
+                            true_effect = (y_comparison - y_tst)
+                            pred_effect = (comparison_preds - tst_preds).ravel()
                             
                             # score ability to predict effect
-                            mae = np.mean(np.abs(true_effect - pred_effect))
-                            pearson_r = pearsonr(true_effect, pred_effect)
+                            mae = np.mean(np.abs(true_effect - pred_effect), dtype=np.float32).item()
+                            pearson_r, _ = pearsonr(true_effect, pred_effect)
                             r2 = r2_score(true_effect, pred_effect)
 
                             effect_results[instance][pos.item()][alt_aa.item()] = {
-                                'pearson_r': pearson_r,
+                                'pearson_r': pearson_r.item(),
                                 'r2': r2,
                                 'mean_absolute_error': mae
                             }
@@ -376,15 +412,15 @@ def positional_extrapolation_test(model_dict: dict,
         # Iterate through the nested dictionary structure
         for model, landscapes in complete_results.items():
             for landscape, replicates in landscapes.items():
-                for replicate, positions in replicates.items():
-                    for pos, splits in positions.items():
+                for replicate, sites in replicates.items():
+                    for site, splits in sites.items():
                         for data_split, metrics in splits.items():
                             # Append a row with the relevant data
                             training_rows.append({
                                 "model": model,
                                 "landscape": landscape,
                                 "replicate": replicate,
-                                "train position": pos,
+                                "fixed_site": site,
                                 "data_split": data_split,
                                 "pearson_r": metrics.get("pearson_r", None),
                                 "r2": metrics.get("r2", None),
@@ -399,21 +435,21 @@ def positional_extrapolation_test(model_dict: dict,
         # Prepare a list to hold rows for the DataFrame
         effect_rows = []
         # Iterate through the nested dictionary structure
-        for model, landscapes in complete_results.items():
+        for model, landscapes in effect_complete_results.items():
             for landscape, replicates in landscapes.items():
-                for replicate, positions in replicates.items():
-                    for pos, splits in positions.items():
-                        for data_split, metrics in splits.items():
+                for replicate, sites in replicates.items():
+                    for site, amino_acids in sites.items():
+                        for aa, metrics in amino_acids.items():
                             # Append a row with the relevant data
                             effect_rows.append({
                                 "model": model,
                                 "landscape": landscape,
                                 "replicate": replicate,
-                                "train position": pos,
-                                "data_split": data_split,
+                                "fixed_site": site,
+                                "test_aa": aa,
                                 "pearson_r": metrics.get("pearson_r", None),
                                 "r2": metrics.get("r2", None),
-                                "mae": metrics.get("mae", None)
+                                "mae": metrics.get("mean_absolute_error", None)
                             })
         # Create a DataFrame from the rows
         df = pd.DataFrame(effect_rows)
