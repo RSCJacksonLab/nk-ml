@@ -238,7 +238,7 @@ def length_dependency_test(model_dict: dict,
                                 "train": train_score,
                                 "test": test_score
                             }
-                            
+                        print(score)
                         results[instance][fold][length] = score
                         
             complete_results[model_name][landscape_name] = results

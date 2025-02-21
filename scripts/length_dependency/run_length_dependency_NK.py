@@ -5,9 +5,9 @@ import time
 
 ALPHABET = 'ACDEFG'
 SEQ_LEN  = 6
-N_REPLICATES = 1
+N_REPLICATES = 4
 N_EPOCHS = 1
-PATIENCE = 8
+PATIENCE = 10
 MIN_DELTA = 1e-5
 
 def main():

@@ -677,6 +677,8 @@ class ProteinLandscape():
             split=split,
             shuffle=shuffle,
             random_state=random_state,
+            convert_to_ohe=True,
+            flatten_ohe=False,
         )
 
     def save(self, name=None, ext=".txt"):
