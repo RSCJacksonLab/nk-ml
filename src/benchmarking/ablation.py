@@ -157,7 +157,6 @@ def ablation_test(model_dict: dict,
                             
                             print(f'Loading model hparams: {model_hparams}')
 
-
                             # train model and ablated data
                             print('Fitting model')
                             loaded_model.fit((actual_x_train, 
@@ -189,7 +188,6 @@ def ablation_test(model_dict: dict,
                                 
                             }
                         else:
-                            continue #for testing 
                             # flatten input data
                             actual_x_train = [
                                 i.flatten().reshape(-1, 1) 

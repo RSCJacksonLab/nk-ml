@@ -7,7 +7,7 @@ import time
 ALPHABET = 'ACDEFGHIKLMNPQRSTVWY'
 SEQ_LEN  = 4
 N_REPLICATES = 4
-N_EPOCHS = 150
+N_EPOCHS = 1
 PATIENCE = 10
 MIN_DELTA = 1e-5
 
@@ -38,7 +38,7 @@ def main():
                                                             sequence_len=SEQ_LEN, 
                                                             alphabet_size=len(ALPHABET), 
                                                             file_name='positional_extrapolation_results_GB1',
-                                                            directory= './results/',
+                                                            directory= '../../results/',
                                                             n_epochs=N_EPOCHS, 
                                                             patience=PATIENCE,
                                                             min_delta=MIN_DELTA
@@ -55,7 +55,7 @@ def main():
                                                             sequence_len=SEQ_LEN, 
                                                             alphabet_size=len(ALPHABET), 
                                                             file_name='positional_extrapolation_results_GB1_CONTROL',
-                                                            directory= './results/',
+                                                            directory= '../../results/',
                                                             n_epochs=N_EPOCHS, 
                                                             patience=PATIENCE,
                                                             min_delta=MIN_DELTA,

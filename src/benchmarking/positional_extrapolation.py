@@ -191,7 +191,7 @@ def positional_extrapolation_test(model_dict: dict,
                             **model_hparams
                         )
                         # train model
-                        print('Fitting model')
+                        print(f'Fitting model {model_name}')
                         loaded_model.fit((x_trn,
                                           y_trn),
                                           n_epochs=n_epochs, 
@@ -207,7 +207,7 @@ def positional_extrapolation_test(model_dict: dict,
                         train_dloader = DataLoader(train_dset, batch_size=2048)
                         score_train = loaded_model.score(
                             train_dloader
-                        )
+                        )                        
                         results[instance][pos.item()]["train"] = score_train
 
                         for alt_aa in alt_aas_at_pos:
@@ -224,6 +224,8 @@ def positional_extrapolation_test(model_dict: dict,
                                 (x_tst, y_tst)
                             )
                             test_dloader = DataLoader(test_dset, batch_size=2048)
+
+                            print(f'Scoring on test for {alt_aa} at {pos}')
                             results[instance][pos.item()][alt_aa.item()] = loaded_model.score(
                                 test_dloader,
                             )
@@ -231,10 +233,20 @@ def positional_extrapolation_test(model_dict: dict,
                             # get corresponding train data (i.e. data with the same context)
                             comparison_seqs = sequence_tst.copy()
                             comparison_seqs[:, pos] = wt_aa_at_pos
-                            comparison_idx = np.where(np.any(
-                                np.all(sequence_data[:, None, :] == comparison_seqs[None, :, :], axis=2), 
-                                axis=1
-                            ))[0]
+                            
+                            seq_to_idx = {
+                                tuple(seq): i 
+                                for i, seq in enumerate(map(tuple, sequence_data))
+                            }
+                            comparison_idx = np.array(
+                                [seq_to_idx.get(tuple(seq), None) 
+                                for seq in map(tuple, comparison_seqs)],
+                                dtype=object
+                            )
+
+                            valid_mask = (comparison_idx != None).astype(bool)
+                            test_idx = test_idx[valid_mask].astype(np.int32)
+                            comparison_idx = comparison_idx[valid_mask].astype(np.int32)
                             x_comparison = x_data[comparison_idx]
                             y_comparison = y_data[comparison_idx]
 
@@ -246,14 +258,16 @@ def positional_extrapolation_test(model_dict: dict,
                             
                             # get predictions
                             tst_preds, _, _ = loaded_model.predict(test_dloader)
+                            tst_preds = tst_preds[valid_mask]
+                            y_tst = y_tst[valid_mask]
                             comparison_preds, _, _ = loaded_model.predict(comparison_dloader)
                             
                             # get effects
-                            true_effect = (y_comparison - y_tst).flatten()
-                            pred_effect = (comparison_preds - tst_preds).flatten()
+                            true_effect = (y_comparison - y_tst)
+                            pred_effect = (comparison_preds - tst_preds).ravel()
                             
                             # score ability to predict effect
-                            mae = np.mean(np.abs(true_effect - pred_effect))
+                            mae = np.mean(np.abs(true_effect - pred_effect), dtype=np.float32).item()
                             pearson_r, _ = pearsonr(true_effect, pred_effect)
                             r2 = r2_score(true_effect, pred_effect)
 
@@ -313,7 +327,7 @@ def positional_extrapolation_test(model_dict: dict,
                             y_tst = y_data[test_idx]
 
                             x_tst = [
-                                i.flatten().reshape(-1, 1) 
+                                i.ravel().reshape(-1, 1) 
                                 for i in x_tst
                                 ]
                             x_tst = np.concatenate(
@@ -329,15 +343,25 @@ def positional_extrapolation_test(model_dict: dict,
                             # get corresponding train data (i.e. data with the same context)
                             comparison_seqs = sequence_tst.copy()
                             comparison_seqs[:, pos] = wt_aa_at_pos
-                            comparison_idx = np.where(np.any(
-                                np.all(sequence_data[:, None, :] == comparison_seqs[None, :, :], axis=2), 
-                                axis=1
-                            ))[0]
+                            
+                            seq_to_idx = {
+                                tuple(seq): i 
+                                for i, seq in enumerate(map(tuple, sequence_data))
+                            }
+                            comparison_idx = np.array(
+                                [seq_to_idx.get(tuple(seq), None) 
+                                for seq in map(tuple, comparison_seqs)],
+                                dtype=object
+                            )
+
+                            valid_mask = (comparison_idx != None).astype(bool)
+                            test_idx = test_idx[valid_mask].astype(np.int32)
+                            comparison_idx = comparison_idx[valid_mask].astype(np.int32)
                             x_comparison = x_data[comparison_idx]
                             y_comparison = y_data[comparison_idx]
                             
                             x_comparison = [
-                                i.flatten().reshape(-1, 1) 
+                                i.ravel().reshape(-1, 1) 
                                 for i in x_comparison
                                 ]
                             x_comparison = np.concatenate(
@@ -347,14 +371,16 @@ def positional_extrapolation_test(model_dict: dict,
 
                             # get predictions
                             tst_preds = loaded_model.predict(x_tst)
+                            tst_preds = tst_preds[valid_mask]
+                            y_tst = y_tst[valid_mask]
                             comparison_preds = loaded_model.predict(x_comparison)
                             
                             # get effects
-                            true_effect = (y_comparison - y_tst).flatten()
-                            pred_effect = (comparison_preds - tst_preds).flatten()
+                            true_effect = (y_comparison - y_tst)
+                            pred_effect = (comparison_preds - tst_preds).ravel()
                             
                             # score ability to predict effect
-                            mae = np.mean(np.abs(true_effect - pred_effect)).item()
+                            mae = np.mean(np.abs(true_effect - pred_effect), dtype=np.float32).item()
                             pearson_r, _ = pearsonr(true_effect, pred_effect)
                             r2 = r2_score(true_effect, pred_effect)
 
