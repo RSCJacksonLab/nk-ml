@@ -70,7 +70,6 @@ def extrapolation_test(model_dict: dict,
         saved.
 
     file_name : str, default=None
-
         File name to use if saving file. If none is provided, user will
         be prompted for one.
 
@@ -119,6 +118,7 @@ def extrapolation_test(model_dict: dict,
 
                 # deletes zero if it listed as a distance
                 distances = [d for d in distances if d] 
+                
                 # cross fold eval
                 for fold in range(cross_validation):
 

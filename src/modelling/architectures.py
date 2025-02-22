@@ -65,7 +65,7 @@ class NeuralNetworkRegression(nn.Module):
         val_data: Optional[Tuple[ArrayLike, ArrayLike]] = None,
         n_epochs: int = 30,
         patience: int = 5,
-        min_delta: int = 1e-5
+        min_delta: float = 1e-5
 ) -> Tuple[dict, dict]:
         '''
         Train model on provided data. Will make validation data
@@ -203,7 +203,7 @@ class NeuralNetworkRegression(nn.Module):
         # The below code block handles such exceptions
         try: 
             pearson_r, _ = pearsonr(all_preds.flatten(),
-                                    all_targets.flatten())
+                                    all_targets)
             pearson_r = pearson_r.item()
         except Exception as e:
             print(f"An error occured: {e}")

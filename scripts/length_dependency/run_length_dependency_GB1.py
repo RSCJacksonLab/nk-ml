@@ -1,14 +1,7 @@
-import numpy as np
-
-from benchmarking.ablation import ablation_test
-
+from benchmarking.length_dependency import length_dependency_test
 from benchmarking.file_proc import make_landscape_data_dicts, sub_dict
 
 import time
-import random
-
-random.seed(10) 
-
 
 ALPHABET = 'ACDEFGHIKLMNPQRSTVWY'
 SEQ_LEN  = 4
@@ -17,8 +10,7 @@ N_EPOCHS = 150
 PATIENCE = 10
 MIN_DELTA = 1e-5
 
-#ablation GB1
-def main(): 
+def main():
     print('Loading data and hyperparameter optimisation.')
     model_dict, data_dict = make_landscape_data_dicts(
         data_dir='../../data/experimental_datasets/', 
@@ -29,36 +21,24 @@ def main():
         random_seed=1
         )
 
-    d1 = model_dict['gb1']['gb']
-    d2 = model_dict['gb1']['rf']
-
-    filt_dict = {'gb1':{'gb':d1, 'rf': d2}}
-
-
-    #filtered_model_dict = model_dict['gb1']['gb'] + model_dict['gb1']['rf']
-
-
     print('Training and testing models.')
-
     t1 = time.time()
-    ablation_results = ablation_test(
-        model_dict=filt_dict, 
+    length_dependency_results = length_dependency_test(
+        model_dict=model_dict, 
         landscape_dict=data_dict, 
-        sequence_len=SEQ_LEN, 
-        alphabet_size=len(ALPHABET), 
-        file_name='ablation_results_GB1_rf_gb',
-        directory= '../../results/',
+        alphabet_size=len(ALPHABET),
+        amino_acids=ALPHABET,
+        file_name='length_dependency_results_GB1',
+        directory= './results/',
         n_epochs=N_EPOCHS, 
         patience=PATIENCE,
-        min_delta=MIN_DELTA
+        min_delta=MIN_DELTA, 
         )
     t2 = time.time()
     
-    with open('../../results/ablation_time__rf_gb_GB1.log', 'w') as file: 
+    with open('./results/length_dependency_GB1_time.log', 'w') as file: 
         file.write(f"Time taken: {t2-t1} seconds")       
 
 
 if __name__ == "__main__": 
     main()
-
-
