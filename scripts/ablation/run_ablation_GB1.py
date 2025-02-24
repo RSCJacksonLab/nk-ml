@@ -28,25 +28,38 @@ def main():
         n_replicates=N_REPLICATES,
         random_seed=1
         )
-    
+
+    d1 = model_dict['gb1']['gb']
+    d2 = model_dict['gb1']['rf']
+
+    filt_dict = {'gb1':{'gb':d1, 'rf': d2}}
+
+
+    #filtered_model_dict = model_dict['gb1']['gb'] + model_dict['gb1']['rf']
+
 
     print('Training and testing models.')
 
     t1 = time.time()
     ablation_results = ablation_test(
-        model_dict=model_dict, 
+        model_dict=filt_dict, 
         landscape_dict=data_dict, 
         sequence_len=SEQ_LEN, 
         alphabet_size=len(ALPHABET), 
+<<<<<<< HEAD
         file_name='ablation_results_GB1',
         directory= './results/',
+=======
+        file_name='ablation_results_GB1_rf_gb',
+        directory= '../../results/',
+>>>>>>> a8fb5acbf32536687dc3db42b1c14bf3fce9ddc3
         n_epochs=N_EPOCHS, 
         patience=PATIENCE,
         min_delta=MIN_DELTA
         )
     t2 = time.time()
     
-    with open('../../results/ablation_time_GB1.log', 'w') as file: 
+    with open('../../results/ablation_time__rf_gb_GB1.log', 'w') as file: 
         file.write(f"Time taken: {t2-t1} seconds")       
 
 
