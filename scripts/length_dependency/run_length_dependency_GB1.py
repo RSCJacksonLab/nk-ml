@@ -13,8 +13,8 @@ MIN_DELTA = 1e-5
 def main():
     print('Loading data and hyperparameter optimisation.')
     model_dict, data_dict = make_landscape_data_dicts(
-        data_dir='../../data/experimental_datasets/', 
-        model_dir='../../hyperopt/ohe/gb1_hparams/', 
+        data_dir='./data/experimental_datasets/', 
+        model_dir='./hyperopt/ohe/gb1_hparams/', 
         alphabet=ALPHABET, 
         experimental=True, 
         n_replicates=N_REPLICATES,
