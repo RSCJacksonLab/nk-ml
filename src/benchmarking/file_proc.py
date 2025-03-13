@@ -4,6 +4,8 @@ import yaml
 import random
 import numpy as np
 
+from typing import Optional
+
 from pscapes import ProteinLandscape
 
  
@@ -14,7 +16,9 @@ def make_landscape_data_dicts(
     alphabet: str = 'ACDEFGHIKLMNPQRSTVWY', 
     experimental: bool = False,
     n_replicates: int = 4, 
-    random_seed: int = 1):
+    random_seed: int = 1,
+    seed_seqs: Optional[list] = None,
+    landscape_names: Optional[list] = None):
 
     """
     Function to parse hyperparameter and raw landscape data files into format suitable for extrapolation/ablation/
@@ -24,7 +28,8 @@ def make_landscape_data_dicts(
         data_dir (str): directory where raw landscape data files are stored 
         model_dir (str): directory where hyperparameter files are stores 
         alphabet (str): the amino acid alphabet for this protein landscape 
-        seed_id (int):  index of the sequence you want to set as the seed sequence 
+        seed_id (int):  index of the sequence you want to set as the seed sequence
+        seed_seqs (list): seed sequences for generating landscapes - only possible for experimental.
 
     Returns: 
         model_dict (dict): dictionary with model hyperaparameters 
@@ -37,18 +42,19 @@ def make_landscape_data_dicts(
     hparam_set_files = [f for f in hparam_set_files if f.endswith(".yaml")]
 
     # find csv files in data dir
-
     data_files = os.listdir(data_dir)
     data_files = [f for f in data_files if f.endswith(".csv")]
 
     # get landscape names and model names
-
-    landscape_names = sorted({filename.split('_')[0]
-                              for filename in hparam_set_files})
+    if not landscape_names:
+        landscape_names = sorted(
+            {filename.split('_')[0] for filename in hparam_set_files}
+        )
     
-    model_names = sorted({filename.split('_')[1].replace('.yaml', '')
-
-                          for filename in hparam_set_files})
+    model_names = sorted(
+        {filename.split('_')[1].replace('.yaml', '') 
+         for filename in hparam_set_files}
+    )
     model_dict = {}
     data_dict = {}
     
@@ -91,18 +97,28 @@ def make_landscape_data_dicts(
             
             n_sequences = test_landscape.num_sequences()
             
-
-            r_seed_ids = np.random.randint(low=0, 
-                                           high=n_sequences-1,
-                                           size=n_replicates)
-            
-            landscape_dict = {f'r{r_index}': ProteinLandscape(
-                csv_path=data_dir + '/'+filename, 
-                amino_acids=alphabet, 
-                seed_id=r
-            )
-            for r_index, r in enumerate(r_seed_ids)
-            }
+            if seed_seqs is None:
+                r_seed_ids = np.random.randint(low=0, 
+                                            high=n_sequences-1,
+                                            size=n_replicates)
+                
+                landscape_dict = {
+                    f'r{r_index}': ProteinLandscape(
+                        csv_path=data_dir + '/'+filename, 
+                        amino_acids=alphabet, 
+                        seed_id=r
+                    )
+                    for r_index, r in enumerate(r_seed_ids)
+                }
+            else:
+                landscape_dict = {
+                    seed_seq: ProteinLandscape(
+                        csv_path=data_dir + '/'+filename, 
+                        amino_acids=alphabet, 
+                        seed_seq=seed_seq
+                    )
+                    for seed_seq in seed_seqs
+                }
 
 # landscape dict {k1: {r1: ProteinLandscape(), r2: PL}, k2: }
 
@@ -148,16 +164,20 @@ def make_landscape_data_dicts(
 
 def sub_dict(data_dict: dict,
              n_replicates: int = 4, 
-             random_seed: int = 1):
+             random_seed: int = 1,
+             replicate_names: Optional[list] = None):
     
     """ Utility function for subsampling replicates from data_dict.
         Useful for reducing the number of replicates fed into experimental scripts. 
     """
-    random.seed(random_seed)
-
     landscape_keys = list(data_dict.keys())
     replicate_keys = list(data_dict[landscape_keys[0]])
-    selection = random.sample(replicate_keys, n_replicates)
+
+    if replicate_names:
+        selection = replicate_names
+    else:
+        random.seed(random_seed)
+        selection = random.sample(replicate_keys, n_replicates)
 
     out_dict = {i:{} for i in landscape_keys}
 

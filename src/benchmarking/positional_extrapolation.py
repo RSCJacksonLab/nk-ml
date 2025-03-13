@@ -10,14 +10,16 @@ at sequence positions that are never modified in the training data.
 Ensure test data includes mutations at sites where no variation is
 observed in the training data.
 
-Modification of code from https://github.com/acmater/NK_Benchmarking/
+Inspired by https://github.com/acmater/NK_Benchmarking/
 '''
 
 import inspect
 import numpy as np
 import pandas as pd
 import pickle as pkl
+import os
 
+from numpy.random import shuffle
 from scipy.stats import pearsonr
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.metrics import r2_score
@@ -33,15 +35,16 @@ def positional_extrapolation_test(model_dict: dict,
                                   landscape_dict: dict,
                                   sequence_len: int,
                                   alphabet_size: int,
-                                  split: float = 0.8,
-                                  cross_validation: int = 1,
                                   control_pct: Optional[float] = None,
                                   save: bool = True,
                                   file_name: Optional[str] = None,
                                   directory: str = "results/", 
                                   n_epochs: int = 30, 
                                   patience: int = 5, 
-                                  min_delta: float = 1e-5, ):
+                                  min_delta: float = 1e-5,
+                                  train: bool = True,
+                                  save_effects: bool=False,
+                                  model_ls: Optional[list]=None):
     """
     Positional extrapolation function that takes a dictionary of models and a
     landscape dictionary and iterates over all models and landscapes,
@@ -85,11 +88,22 @@ def positional_extrapolation_test(model_dict: dict,
 
     directory : str, default="Results/"
         Directory is the directory to which the results will be saved.
+
+    train : bool, default = True
+        Whether to train the models before predictions or not. Defaults
+        to True.
+
+    save_effects: bool, default = False
+        Will make a directory and save predicted and true effects.
+
+    model_ls : Optional[list], default = None
+        If provided, will overwrite models stored - i.e. for testing on 
+        particular models.
     """
 
     # get the model names 
-    first_key = list(model_dict.keys())[0]
-    model_names = list(model_dict[first_key].keys())
+    model_names = list(next(iter(model_dict.values())).keys())
+    model_names = model_names if model_ls is None else model_ls
 
     complete_results = {
         model: {key: 0 for key in landscape_dict.keys()} 
@@ -98,6 +112,13 @@ def positional_extrapolation_test(model_dict: dict,
     effect_complete_results = {
         model: {key: 0 for key in landscape_dict.keys()} 
         for model in model_names
+    }
+    true_effect_results = {
+        'seed_aa': [],
+        'mutant_aa': [],
+        'seed_sequence': [],
+        'mutant_sequence': [],
+        'mutational_effect': []
     }
     # iterate over model types
     for model_name in model_names: 
@@ -165,7 +186,6 @@ def positional_extrapolation_test(model_dict: dict,
 
                     # get data with position fixed to WT
                     trn_idx = np.where(sequence_data[:, pos] == wt_aa_at_pos)[0]
-
                     # if control run - add some variants back in
                     added_idx = np.array([])
                     if control_pct:
@@ -190,14 +210,15 @@ def positional_extrapolation_test(model_dict: dict,
                             model_name,
                             **model_hparams
                         )
-                        # train model
-                        print(f'Fitting model {model_name}')
-                        loaded_model.fit((x_trn,
-                                          y_trn),
-                                          n_epochs=n_epochs, 
-                                          patience=patience, 
-                                          min_delta=min_delta 
-                                         )
+                        if train:
+                            # train model
+                            print(f'Fitting model {model_name}')
+                            loaded_model.fit((x_trn,
+                                              y_trn),
+                                              n_epochs=n_epochs, 
+                                              patience=patience, 
+                                              min_delta=min_delta 
+                                              )
 
                         # score model
                         print('Scoring model')
@@ -211,6 +232,7 @@ def positional_extrapolation_test(model_dict: dict,
                         results[instance][pos.item()]["train"] = score_train
 
                         for alt_aa in alt_aas_at_pos:
+                            
                             print(f'Testing {model_name} on {alt_aa} at site {pos}')
 
                             test_idx = np.where(sequence_data[:, pos] == alt_aa)[0]
@@ -257,24 +279,47 @@ def positional_extrapolation_test(model_dict: dict,
                                                             batch_size=2048)
                             
                             # get predictions
-                            tst_preds, _, _ = loaded_model.predict(test_dloader)
+                            tst_preds, _, _, _ = loaded_model.predict(test_dloader)
                             tst_preds = tst_preds[valid_mask]
                             y_tst = y_tst[valid_mask]
-                            comparison_preds, _, _ = loaded_model.predict(comparison_dloader)
+                            comparison_preds, _, _, _ = loaded_model.predict(comparison_dloader)
                             
                             # get effects
                             true_effect = (y_comparison - y_tst)
                             pred_effect = (comparison_preds - tst_preds).ravel()
+
+                            true_effect_results["seed_aa"] += [wt_aa_at_pos] * len(comparison_idx)
+                            true_effect_results["mutant_aa"] += [alt_aa] * len(comparison_idx)
+                            true_effect_results["seed_sequence"] += ["".join(seq) for seq in sequence_data[comparison_idx]]
+                            true_effect_results["mutant_sequence"] += ["".join(seq) for seq in sequence_data[test_idx]]
+                            true_effect_results["mutational_effect"] += true_effect.tolist()
                             
                             # score ability to predict effect
                             mae = np.mean(np.abs(true_effect - pred_effect), dtype=np.float32).item()
-                            pearson_r, _ = pearsonr(true_effect, pred_effect)
+                            pearson_r, pval = pearsonr(true_effect, pred_effect)
                             r2 = r2_score(true_effect, pred_effect)
+
+                            # full results 
+                            if save_effects:
+                                os.makedirs(directory + file_name + "_EFFECTS", exist_ok=True)
+                                df = {
+                                    "WT sequences": ["".join(seq) for seq in sequence_data[comparison_idx]],
+                                    "Mutant sequences": ["".join(seq) for seq in sequence_data[test_idx]],
+                                    "True effects": true_effect.tolist(),
+                                    "Predicted effects": pred_effect.tolist(),
+                                    "Predicted WT": comparison_preds.tolist(),
+                                    "Predicted mutant": tst_preds.tolist(),
+                                }
+                                file_name = f"nk{landscape_name}_instance{instance}_position{pos}_on{alt_aa}_rep{idx}"
+                                pd.DataFrame(df).to_csv(f"{directory}{file_name}_EFFECTS/{file_name}", index=False)
 
                             effect_results[instance][pos.item()][alt_aa.item()] = {
                                 'pearson_r': pearson_r.item(),
+                                'pearson_r_p_val': pval.item(),
                                 'r2': r2,
-                                'mean_absolute_error': mae
+                                'mean_absolute_error': mae,
+                                'seed_aa': wt_aa_at_pos,
+                                'mutant_aa': alt_aa
                             }
 
                     else:
@@ -290,7 +335,6 @@ def positional_extrapolation_test(model_dict: dict,
                         # set model class
                         if model_name == "rf":
                             model_class = RandomForestRegressor
-
                         elif model_name == "gb":
                             model_class = GradientBoostingRegressor
                         else:
@@ -309,6 +353,10 @@ def positional_extrapolation_test(model_dict: dict,
                             **kwargs_filtered
                         )
                         # train model
+                        if not train:
+                            # no random init of sklearn models -> shuffle data instead
+                            shuffle(y_trn)
+                        
                         print('Fitting model')
                         loaded_model.fit(x_trn, y_trn)
                         results[instance][pos.item()]["train"] = score_sklearn_model(
@@ -393,6 +441,9 @@ def positional_extrapolation_test(model_dict: dict,
             complete_results[model_name][landscape_name] = results
             effect_complete_results[model_name][landscape_name] = effect_results
 
+    true_mutational_effect_df = pd.DataFrame(true_effect_results)
+    true_mutational_effect_df.to_csv(directory + file_name + "_TrueEffects" + ".csv", index=False)
+
     if save:
         if not file_name:
             file_name = input(
@@ -448,8 +499,11 @@ def positional_extrapolation_test(model_dict: dict,
                                 "fixed_site": site,
                                 "test_aa": aa,
                                 "pearson_r": metrics.get("pearson_r", None),
+                                "pearson_p_val": metrics.get("pearson_r_p_val", None),
                                 "r2": metrics.get("r2", None),
-                                "mae": metrics.get("mean_absolute_error", None)
+                                "mae": metrics.get("mean_absolute_error", None),
+                                "seed_aa": metrics.get("seed_aa", None),
+                                "mutant_aa": metrics.get("mutant_aa", None),
                             })
         # Create a DataFrame from the rows
         df = pd.DataFrame(effect_rows)

@@ -156,25 +156,28 @@ class NeuralNetworkRegression(nn.Module):
         loss_fn = nn.MSELoss()
         total_loss = 0
         all_preds = []
-        all_targets = []        
+        all_targets = []
+        all_reps = []  
         # get loss + predictions 
         t1 = time.time()
         with torch.no_grad():
             for inputs, targets in dloader:
                 inputs, targets = inputs.to(device), targets.to(device)
-                outputs = self.model(inputs)
+                outputs, reps = self.model(inputs)
                 loss = loss_fn(outputs, targets.unsqueeze(-1))
                 total_loss += loss.item()
                 all_preds.append(outputs.cpu().numpy())
                 all_targets.append(targets.cpu().numpy())
+                all_reps.append(reps.cpu().numpy())
 
         all_preds = np.concatenate(all_preds, axis=0)
         all_targets = np.concatenate(all_targets, axis=0)
+        all_reps = np.concatenate(all_reps, axis=0)
         avg_loss = total_loss / len(dloader)
         t2 = time.time()
         print(f"Prediction time taken is {t2-t1}")
 
-        return all_preds, all_targets, avg_loss
+        return all_preds, all_targets, all_reps, avg_loss
 
     def score(
         self,
@@ -195,7 +198,7 @@ class NeuralNetworkRegression(nn.Module):
         '''
 
         # make predictions
-        all_preds, all_targets, avg_loss = self.predict(dloader)
+        all_preds, all_targets, _, avg_loss = self.predict(dloader)
         
         # get performance metrics
 
@@ -241,8 +244,8 @@ class SequenceRegressionLinear(nn.Module):
         # to [batch_size, sequence_length * alphabet_size]
         x = x.view(x.size(0), -1)
         # Pass through the linear layer
-        x = self.linear(x)  # Shape: (batch_size, 1)
-        return x
+        output = self.linear(x)  # Shape: (batch_size, 1)
+        return output, None
 
 
 class SequenceRegressionMLP(nn.Module):
@@ -282,8 +285,8 @@ class SequenceRegressionMLP(nn.Module):
         for fc_layer in self.fc_layers: 
             x = torch.relu(fc_layer(x))
         # Output layer without activation for real value prediction
-        x = self.output_layer(x)  
-        return x
+        output = self.output_layer(x)  
+        return output, x
     
 
 class SequenceRegressionCNN(nn.Module):
@@ -371,7 +374,7 @@ class SequenceRegressionCNN(nn.Module):
         x = x.view(x.size(0), -1)
         # Fully connected layer to produce a single output
         output = self.fc(x)
-        return output
+        return output, x
 
 
 class SequenceRegressionLSTM(nn.Module):
@@ -436,7 +439,7 @@ class SequenceRegressionLSTM(nn.Module):
 
         # Pass through the output layer
         output = self.output_layer(last_out)  # Shape: (batch_size, 1)
-        return output
+        return output, last_out
 
 
 class PositionalEncoding(nn.Module):
@@ -492,13 +495,13 @@ class SequenceRegressionTransformer(nn.Module):
                  nhead: int = 4,
                  n_layers: int = 2,
                  n_dim: int = 256,
-                 max_seq_length: int = 10):
+                 sequence_length: int = 10):
         super(SequenceRegressionTransformer, self).__init__()
         # Embedding layer to convert ohe amino acids to dense vectors
         self.embedding = nn.Linear(input_dim, d_model)
         
         # Positional encoding to add sequence position information
-        self.positional_encoding = PositionalEncoding(d_model, max_seq_length)
+        self.positional_encoding = PositionalEncoding(d_model, sequence_length)
         # Transformer encoder
         encoder_layer = nn.TransformerEncoderLayer(d_model=d_model, 
                                                    nhead=nhead, 
@@ -527,7 +530,7 @@ class SequenceRegressionTransformer(nn.Module):
         # Fully connected layer to produce a single output
         # Shape: (batch_size, 1)
         output = self.fc_out(final_out)
-        return output
+        return output, final_out
     
 # for mapping model names to class
 MODEL_MAPPING = {

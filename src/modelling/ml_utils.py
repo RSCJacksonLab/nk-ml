@@ -212,7 +212,7 @@ def train_model(model: nn.Module,
             x_batch, y_batch = x_batch.to(device), y_batch.to(device)
             
             optimizer.zero_grad()
-            y_pred = model(x_batch)
+            y_pred, _ = model(x_batch)
             loss = loss_fn(y_pred, y_batch.unsqueeze(-1))
             loss.backward()
             optimizer.step()
@@ -231,7 +231,7 @@ def train_model(model: nn.Module,
                 #print(targets.shape)
                 inputs, targets = inputs.to(device), targets.to(device)
                 
-                outputs = model(inputs)
+                outputs, _ = model(inputs)
                 loss = loss_fn(outputs, targets.unsqueeze(-1))
                 val_loss += loss.item()
         val_loss /= len(val_loader)

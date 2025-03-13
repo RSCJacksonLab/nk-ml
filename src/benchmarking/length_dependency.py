@@ -148,7 +148,7 @@ def length_dependency_test(model_dict: dict,
                             
                             print(f'Loading model hparams: {model_hparams}')
 
-                            # train model and ablated data
+                            # train model
                             print('Fitting model')
                             loaded_model.fit((x_trn, 
                                               y_trn),
@@ -161,14 +161,16 @@ def length_dependency_test(model_dict: dict,
                             train_dset = make_dataset(
                                 (x_trn, y_trn)
                             )
+                            
+                            batch_size = 1024 if length < 200 else 512
                             train_dloader = DataLoader(train_dset, 
-                                                       batch_size=2048)
+                                                       batch_size=batch_size)
                             score_train = loaded_model.score(
                                 train_dloader
                             )
                             test_dset = make_dataset((x_tst, y_tst))
                             test_dloader = DataLoader(test_dset, 
-                                                      batch_size=2048)
+                                                      batch_size=batch_size)
                             score_test = loaded_model.score(
                                 test_dloader,
                             )

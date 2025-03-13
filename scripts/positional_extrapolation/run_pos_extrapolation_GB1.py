@@ -7,7 +7,7 @@ import time
 ALPHABET = 'ACDEFGHIKLMNPQRSTVWY'
 SEQ_LEN  = 4
 N_REPLICATES = 4
-N_EPOCHS = 1
+N_EPOCHS = 150
 PATIENCE = 10
 MIN_DELTA = 1e-5
 
@@ -21,46 +21,51 @@ def main():
                                                       alphabet=ALPHABET,
                                                       experimental=True,
                                                       n_replicates=N_REPLICATES,
-                                                      random_seed=1)
+                                                      random_seed=1,
+                                                      seed_seqs = [aa * SEQ_LEN for aa in ALPHABET])
     
     
 
-    small_dict = sub_dict(data_dict, 
-                          n_replicates=N_REPLICATES, 
-                          random_seed=1)
+    # small_dict = sub_dict(data_dict, 
+    #                       n_replicates=N_REPLICATES, 
+    #                       random_seed=1)
+    small_dict = data_dict
 
 
 
     print('Training and testing models.')
     t1 = time.time()
+    
     extrapolation_results = positional_extrapolation_test(model_dict=model_dict, 
                                                             landscape_dict=small_dict, 
                                                             sequence_len=SEQ_LEN, 
                                                             alphabet_size=len(ALPHABET), 
-                                                            file_name='positional_extrapolation_results_GB1',
-                                                            directory= '../../results/',
-                                                            n_epochs=N_EPOCHS, 
-                                                            patience=PATIENCE,
-                                                            min_delta=MIN_DELTA
-                                                            )
-    t2 = time.time()
-    
-    with open('./results/positional_extrapolation_time_GB1.log', 'w') as file: 
-        file.write(f"Time taken: {t2-t1} seconds")    
-
-    # run control
-    print('Training and testing models as controls.')
-    extrapolation_control_results = positional_extrapolation_test(model_dict=model_dict, 
-                                                            landscape_dict=small_dict, 
-                                                            sequence_len=SEQ_LEN, 
-                                                            alphabet_size=len(ALPHABET), 
-                                                            file_name='positional_extrapolation_results_GB1_CONTROL',
-                                                            directory= '../../results/',
+                                                            file_name='positional_extrapolation_True_effects',
+                                                            directory= './results/',
                                                             n_epochs=N_EPOCHS, 
                                                             patience=PATIENCE,
                                                             min_delta=MIN_DELTA,
-                                                            control_pct=0.8
-                                                            )   
+                                                            train=False,
+                                                            model_ls=["cnn"],
+                                                            )
+    # t2 = time.time()
+    
+    # with open('./results/positional_extrapolation_time_GB1.log', 'w') as file: 
+    #     file.write(f"Time taken: {t2-t1} seconds")    
+
+    # # run control
+    # print('Training and testing models as controls.')
+    # extrapolation_control_results = positional_extrapolation_test(model_dict=model_dict, 
+    #                                                         landscape_dict=small_dict, 
+    #                                                         sequence_len=SEQ_LEN, 
+    #                                                         alphabet_size=len(ALPHABET), 
+    #                                                         file_name='positional_extrapolation_results_GB1_CONTROL',
+    #                                                         directory= '../../results/',
+    #                                                         n_epochs=N_EPOCHS, 
+    #                                                         patience=PATIENCE,
+    #                                                         min_delta=MIN_DELTA,
+    #                                                         control_pct=0.8
+    #                                                         )   
 
 
 if __name__ == "__main__": 
