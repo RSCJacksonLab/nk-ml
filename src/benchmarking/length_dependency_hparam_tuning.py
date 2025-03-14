@@ -114,7 +114,7 @@ def length_dependency_test_with_tuning(
         'data_split': [],
         'pearson_r': [],
         'r2': [],
-        'mse': [],
+        'mse_loss': [],
     }
 
     # iterate over each landscape
@@ -130,9 +130,10 @@ def length_dependency_test_with_tuning(
 
             # iterate over each instance of each landscape
             ## set instance to use for tuning first
-            landscape_instances = landscape_dict[landscape_name].keys()
-            tuning_instance = landscape_instances.pop(tuning_landscape_rep)
-            landscape_instances = [tuning_instance] + landscape_instances
+            landscape_instances = list(landscape_dict[landscape_name].keys())
+            if tuning_landscape_rep is not None:
+                landscape_instances.remove(tuning_landscape_rep)
+                landscape_instances = [tuning_landscape_rep] + landscape_instances
 
             for idx, instance in enumerate(landscape_instances):
 
@@ -150,9 +151,6 @@ def length_dependency_test_with_tuning(
 
                     # Iterate over each INSTANCE of each landscape, 1 for experimental
                     for length in seq_lens:
-
-                        if not length in results[instance][fold].keys():
-                            results[instance][fold][length] = {}
 
                         x_trn, y_trn, x_tst, y_tst = landscape_instance.return_lengthened_data(
                             length,
@@ -178,16 +176,16 @@ def length_dependency_test_with_tuning(
                                 # Optuna study
                                 study = opt.create_study(direction='minimize')
                                 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-                                n_trials = len(model_hparams[idx]) * n_trials_multiplier
+                                n_trials = len(search_space[model_name]) * n_trials_multiplier
 
                                 study.optimize(
                                     lambda trial : objective_fn(
                                         trial,
                                         model_name,
-                                        search_space,
+                                        search_space[model_name],
                                         alphabet_size,
                                         length,
-                                        (x_trn, y_trn)
+                                        (x_trn, y_trn),
                                         (x_tst, y_tst),
                                         n_epochs,
                                         patience,
@@ -206,47 +204,46 @@ def length_dependency_test_with_tuning(
                                 model_hparam_dict[length] = model_hparams
         
                             # instantiate on determined hyperparameters
-                            else:
-                                model_hparams = model_hparam_dict[length]
-                                loaded_model = architectures.NeuralNetworkRegression(
-                                    model_name,
-                                    **model_hparams
-                                )
-                            
-                                print(f'Loading model hparams: {model_hparams}')
+                            model_hparams = model_hparam_dict[length]
+                            loaded_model = architectures.NeuralNetworkRegression(
+                                model_name,
+                                **model_hparams
+                            )
+                        
+                            print(f'Loading model hparams: {model_hparams}')
 
-                                # train model
-                                print('Fitting model')
-                                loaded_model.fit((x_trn, 
-                                                y_trn),
-                                                n_epochs=n_epochs, 
-                                                patience=patience,
-                                                min_delta=min_delta)
+                            # train model
+                            print('Fitting model')
+                            loaded_model.fit((x_trn, 
+                                            y_trn),
+                                            n_epochs=n_epochs, 
+                                            patience=patience,
+                                            min_delta=min_delta)
 
-                                # score model
-                                print('Scoring model')
-                                train_dset = make_dataset(
-                                    (x_trn, y_trn)
-                                )
+                            # score model
+                            print('Scoring model')
+                            train_dset = make_dataset(
+                                (x_trn, y_trn)
+                            )
 
-                                # dynamic batch size to accomadate variable sequence lengths
-                                batch_size = 1024 if length < 200 else 512
+                            # dynamic batch size to accomadate variable sequence lengths
+                            batch_size = 1024 if length < 200 else 512
 
-                                train_dloader = DataLoader(train_dset, 
-                                                        batch_size=batch_size)
-                                score_train = loaded_model.score(
-                                    train_dloader
-                                )
-                                test_dset = make_dataset((x_tst, y_tst))
-                                test_dloader = DataLoader(test_dset, 
-                                                        batch_size=batch_size)
-                                score_test = loaded_model.score(
-                                    test_dloader,
-                                )
-                                score = {
-                                    'train': score_train,
-                                    'test': score_test
-                                }
+                            train_dloader = DataLoader(train_dset, 
+                                                    batch_size=batch_size)
+                            score_train = loaded_model.score(
+                                train_dloader
+                            )
+                            test_dset = make_dataset((x_tst, y_tst))
+                            test_dloader = DataLoader(test_dset, 
+                                                    batch_size=batch_size)
+                            score_test = loaded_model.score(
+                                test_dloader,
+                            )
+                            score = {
+                                'train': score_train,
+                                'test': score_test
+                            }
                             
                         else:
                             # flatten input data
@@ -345,26 +342,25 @@ def length_dependency_test_with_tuning(
                                 "train": train_score,
                                 "test": test_score
                             }
-                        results[instance][fold][length] = score
                     
-                    # save results
-                    for split in score.keys():
-                        results['model'].append(model_name)
-                        results['landscape'].append(landscape_name)
-                        results['replicates'].append(instance)
-                        results['tuning_landscape'].append(tuned_rep)
-                        results['cv_fold'].append(fold)
-                        results['sequence_length'].append(length)
-                        results['data_split'].append(split)
-                        results['pearson_r'].append(
-                            score[split].get("pearson_r", None)
-                        )
-                        results['r2'].append(
-                            score[split].get("r2", None)
-                        )
-                        results['mse_loss'].append(
-                            score[split].get("mse_loss", None)
-                        )
+                        # save results
+                        for test_train_split in score.keys():
+                            results['model'].append(model_name)
+                            results['landscape'].append(landscape_name)
+                            results['replicates'].append(instance)
+                            results['tuning_landscape'].append(tuned_rep)
+                            results['cv_fold'].append(fold)
+                            results['sequence_length'].append(length)
+                            results['data_split'].append(split)
+                            results['pearson_r'].append(
+                                score[test_train_split].get("pearson_r", None)
+                            )
+                            results['r2'].append(
+                                score[test_train_split].get("r2", None)
+                            )
+                            results['mse_loss'].append(
+                                score[test_train_split].get("mse_loss", None)
+                            )
             
     if save:
         df = pd.DataFrame(results)

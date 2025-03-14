@@ -367,7 +367,7 @@ def objective_fn(trial: opt.Trial,
         patience=patience,
         min_delta=min_delta
     )
-    return val_res['loss']
+    return val_res
 
 
 def sklearn_objective_fn(trial, 

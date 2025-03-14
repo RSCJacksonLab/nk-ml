@@ -14,11 +14,11 @@ MIN_DELTA = 1e-5
 def main():
     print('Loading data and hyperparameter optimisation.')
 
-    model_dict, data_dict = make_landscape_data_dicts(
+    _, data_dict = make_landscape_data_dicts(
         data_dir='./data/nk_landscapes/', 
         model_dir='./hyperopt/ohe/nk_landscape_hparams/', 
         alphabet=ALPHABET,
-        landscape_names="k1"
+        landscape_names=["k1"]
         )
 
     small_dict = sub_dict(data_dict, 
@@ -30,7 +30,7 @@ def main():
     print('Training and testing models.')
     t1 = time.time()
     length_dependency_test_with_tuning(
-        model_dict=model_dict, 
+        model_ls=["cnn"],
         landscape_dict=small_dict, 
         alphabet_size=len(ALPHABET),
         tuning_landscape_rep="r0",
