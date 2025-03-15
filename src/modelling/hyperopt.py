@@ -1,6 +1,7 @@
 '''
 High-level code for hyperparameter optimisation
 '''
+import numpy as np
 import optuna as opt
 import torch
 import torch.nn as nn
@@ -367,7 +368,7 @@ def objective_fn(trial: opt.Trial,
         patience=patience,
         min_delta=min_delta
     )
-    return val_res
+    return np.mean(val_res)
 
 
 def sklearn_objective_fn(trial, 

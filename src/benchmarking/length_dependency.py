@@ -83,6 +83,8 @@ def length_dependency_test(model_dict: dict,
     first_key = list(model_dict.keys())[0]
     model_names = list(model_dict[first_key].keys())
 
+    model_names = ["linear", "ulstm", "blstm"]
+
     complete_results = {
         model: {key: 0 for key in landscape_dict.keys()} 
         for model in model_names

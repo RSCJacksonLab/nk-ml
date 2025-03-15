@@ -7,7 +7,7 @@ ALPHABET = 'ACDEFG'
 SEQ_LEN  = 6
 N_REPLICATES = 4
 N_TRIALS_MULTIPLIER = 15
-N_EPOCHS = 1
+N_EPOCHS = 150
 PATIENCE = 10
 MIN_DELTA = 1e-5
 
@@ -16,7 +16,7 @@ def main():
 
     _, data_dict = make_landscape_data_dicts(
         data_dir='./data/nk_landscapes/', 
-        model_dir='./hyperopt/ohe/nk_landscape_hparams/', 
+        model_dir='./hyperopt/nk_landscape_hparams/', 
         alphabet=ALPHABET,
         landscape_names=["k1"]
         )
@@ -36,7 +36,7 @@ def main():
         tuning_landscape_rep="r0",
         hparam_reference="nk",
         amino_acids=ALPHABET,
-        file_name='length_dependency_results_wTuning_NK',
+        file_name='length_dependency_results_wTuning_NK_cnn',
         directory= './results/',
         n_epochs=N_EPOCHS, 
         patience=PATIENCE,

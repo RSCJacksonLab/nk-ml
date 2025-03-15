@@ -14,18 +14,20 @@ def main():
     print('Loading data and hyperparameter optimisation.')
     model_dict, data_dict = make_landscape_data_dicts(
         data_dir='./data/nk_landscapes/', 
-        model_dir='./hyperopt/ohe/nk_landscape_hparams/', 
-        alphabet=ALPHABET
+        model_dir='./hyperopt/nk_landscape_hparams/', 
+        alphabet=ALPHABET,
+        landscape_names=["k1"]
         )
 
     small_dict = sub_dict(data_dict, 
         n_replicates=N_REPLICATES, 
-        random_seed=1
+        random_seed=1,
+        replicate_names=['r5', 'r4', 'r7', 'r2']
         )
 
     print('Training and testing models.')
     t1 = time.time()
-    length_dependency_results = length_dependency_test(
+    length_dependency_test(
         model_dict=model_dict, 
         landscape_dict=small_dict, 
         alphabet_size=len(ALPHABET),
@@ -40,7 +42,6 @@ def main():
     
     with open('./results/length_dependency_NK_time.log', 'w') as file: 
         file.write(f"Time taken: {t2-t1} seconds")       
-
 
 if __name__ == "__main__": 
     main()

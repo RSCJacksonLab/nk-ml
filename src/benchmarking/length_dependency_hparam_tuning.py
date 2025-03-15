@@ -351,7 +351,7 @@ def length_dependency_test_with_tuning(
                             results['tuning_landscape'].append(tuned_rep)
                             results['cv_fold'].append(fold)
                             results['sequence_length'].append(length)
-                            results['data_split'].append(split)
+                            results['data_split'].append(test_train_split)
                             results['pearson_r'].append(
                                 score[test_train_split].get("pearson_r", None)
                             )
