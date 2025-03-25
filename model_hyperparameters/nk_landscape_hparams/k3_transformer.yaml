@@ -1,0 +1,5 @@
+d_model: 128
+dim_feedforward: 128
+max_seq_length: 10
+nhead: 8
+num_layers: 2

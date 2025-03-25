@@ -1,0 +1,2 @@
+from pscapes.NK_landscape import make_NK
+from pscapes.landscape_class import ProteinLandscape

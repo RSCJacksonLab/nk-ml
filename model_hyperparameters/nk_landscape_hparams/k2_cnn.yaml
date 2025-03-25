@@ -1,0 +1,7 @@
+kernel_sizes:
+- 3
+- 5
+n_kernels:
+- 224
+- 256
+num_conv_layers: 2
