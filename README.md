@@ -1,11 +1,11 @@
-# Synthetic fitness landscapes as versatile tools for investigating ML-driven protein engineering 
+# Investigating the determinants of performance in machine learning for protein fitness prediction
 
 This repository contains the codebase used for evaluating the performance of key machine learning algorithms on synthetic NK fitness landscapes, across a number of key metrics: 
 
-1. interpolation
-2. extrapolation
-3. ablation
-4. positional extrapolation 
+1. Interpolation;
+2. Extrapolation;
+3. Ablation; and
+4. Positional extrapolation.
 
 ## Python environment 
 All scripts were run using Python 3.10.12 and packages listed in requirements.txt. 
@@ -13,9 +13,8 @@ All scripts were run using Python 3.10.12 and packages listed in requirements.tx
 ## Installation
 After downloading this repository, please create a Python 3.10.12 virtual environment: 
 
-`cd /path/to/nk-2025` \
+`cd /path/to/nk-ml` \
 `python -m venv venv` 
-
 
 
 And then install using `setup.py`: 
@@ -23,12 +22,8 @@ And then install using `setup.py`:
 `pip install -r requirements.txt`\
 `pip install ./setup.py`
 
-Estimated install time: 
-
-## Demos 
-Notebooks containing demonstrations of key code are available in `demos`. 
-
-
+## Demos/Scripts
+The use of source code is found in the `/scripts` directory.
 
 ## File overview 
 
@@ -48,12 +43,12 @@ Scripts used in the generation of results.
 2. `run_hparam_opt_GB1.py`: performs hyperparameter optimisation on GB1 dataset, depositing results in `hyperopt/ohe/gb1_hparams`
 3. `run_hparam_opt_NK.py`: performs hyperparameter optimisation on NK datasets, depositing results in `hyperopt/ohe/nk_landscape_hparams`
 
-
-
 ### `src`
 The package source code directory. Root directory of the project. 
 
 #### `analysis`
+Code for analysing model data.
+1. `aa_reprsentations.py`: Code for extracting amino acid reprsentations from a given model.
 
 #### `benchmarking`
 Subdirectory implementing experiments i.e. training and testing across 4 metrics. 
@@ -75,9 +70,3 @@ Subdirectory containing files for ML archicture definition, data processing and 
 Subdirectory containing ProteinLandscape class and functions to initialise synthetic NK landscapes. 
 1. `landscape_class.py`: definition of ProteinLandscape class, used extensively in the present work 
 2. `NK_landscape.py`: definition of functions to initialise synthetic NK landscapes
-
-
-#### `utils`
-
-
-

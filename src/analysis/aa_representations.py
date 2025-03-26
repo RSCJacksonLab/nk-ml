@@ -13,11 +13,10 @@ import numpy as np
 import pandas as pd
 import pickle as pkl
 
-from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from torch.utils.data import DataLoader
 from typing import Optional
 
-from modelling import architectures, make_dataset, score_sklearn_model
+from modelling import architectures, make_dataset
 from utils import aa_to_ohe
 
 def get_aa_reps(model_dict: dict,
